@@ -15,14 +15,42 @@ class _PickupScreenState extends State<PickupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  final TextEditingController agentController = TextEditingController();
+  final TextEditingController customItemController = TextEditingController();
+
   List<Map<String, dynamic>> clothes = [];
   bool isSubmitting = false;
 
-  void addClothingItem() {
+  final List<Map<String, dynamic>> itemTypes = [
+    {"label": "Shirt", "iconPath": "assets/icons/shirt.png"},
+    {"label": "T-Shirt", "iconPath": "assets/icons/tshirt.png"},
+    {"label": "Pant", "iconPath": "assets/icons/trousers.png"},
+    {"label": "Saree", "iconPath": "assets/icons/saree.png"},
+    {"label": "Blouse", "iconPath": "assets/icons/blouse.png"},
+    {"label": "Dhoti", "iconPath": "assets/icons/dhoti.png"},
+    {"label": "Kids Wear", "iconPath": "assets/icons/baby-clothes.png"},
+    {"label": "Blanket", "iconPath": "assets/icons/blanket.png"},
+    {"label": "Tops", "iconPath": "assets/icons/tshirt.png"},
+    {"label": "Bottom", "iconPath": "assets/icons/garment.png"},
+    {"label": "Towel", "iconPath": "assets/icons/towel.png"},
+    {"label": "Bedsheet", "iconPath": "assets/icons/sheet.png"},
+    {"label": "Custom", "iconPath": "assets/icons/basket.png"},
+  ];
+
+  void addClothingItem(String itemType) {
     setState(() {
-      clothes.add({'item_type': '', 'quantity': 1});
+      clothes.add({'item_type': itemType, 'quantity': 1});
     });
+  }
+
+  Future<void> fetchAndPrefillCustomer(String phone) async {
+    if (phone.length < 10) return;
+    final existingCustomer = await supabaseService.fetchLatestCustomerByPhone(phone);
+    print('Fetched customer: $existingCustomer');
+
+    if (existingCustomer != null) {
+      nameController.text = existingCustomer['customer_name'] ?? '';
+      addressController.text = existingCustomer['customer_address'] ?? '';
+    }
   }
 
   Future<void> submitPickup() async {
@@ -34,7 +62,6 @@ class _PickupScreenState extends State<PickupScreen> {
         customerName: nameController.text.trim(),
         customerPhone: phoneController.text.trim(),
         customerAddress: addressController.text.trim(),
-        agentName: agentController.text.trim(),
         status: 'picked_up',
         pickupTime: DateTime.now(),
         deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
@@ -73,19 +100,46 @@ class _PickupScreenState extends State<PickupScreen> {
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
   );
 
+  void showCustomItemDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Enter Custom Item Type"),
+        content: TextField(
+          controller: customItemController,
+          decoration: const InputDecoration(hintText: "Eg. Curtain, Rug"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (customItemController.text.trim().isNotEmpty) {
+                addClothingItem(customItemController.text.trim());
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    phoneController.addListener(() {
+      if (phoneController.text.length == 10) {
+        fetchAndPrefillCustomer(phoneController.text);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
-        title: const Text(
-          'New Pickup',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 22,
-            color: Colors.white,
-          ),
-        ),
+        title: const Text('New Pickup', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -96,8 +150,8 @@ class _PickupScreenState extends State<PickupScreen> {
             ),
           ),
         ),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -124,70 +178,116 @@ class _PickupScreenState extends State<PickupScreen> {
                 decoration: inputDecoration('Address'),
                 validator: (v) => v!.isEmpty ? 'Enter address' : null,
               ),
-              // const SizedBox(height: 12),
-              // TextFormField(
-              //   controller: agentController,
-              //   decoration: inputDecoration('Agent Name (optional)'),
-              // ),
               const SizedBox(height: 20),
-              Row(
-                children: const [
-                  Text('Clothes List', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                ],
+              const Text(
+                'Select Items',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: itemTypes.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 1,
+                ),
+                itemBuilder: (context, index) {
+                  final item = itemTypes[index];
+                  return InkWell(
+                    onTap: () {
+                      if (item['label'] == 'Custom') {
+                        showCustomItemDialog();
+                      } else {
+                        addClothingItem(item['label']);
+                      }
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            item['iconPath'],
+                            width: 30,
+                            height: 30,
+                            color: const Color(0xFF6A11CB),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            item['label'],
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Selected Items",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
               ...clothes.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: item['item_type'],
-                            onChanged: (val) => item['item_type'] = val,
-                            decoration: const InputDecoration(hintText: 'Item Type'),
+                  child: ListTile(
+                    title: Text(item['item_type'] ?? ''),
+                    trailing: FittedBox(
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: () {
+                              setState(() {
+                                if (item['quantity'] > 1) item['quantity']--;
+                              });
+                            },
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                          width: 60,
-                          child: TextFormField(
-                            initialValue: item['quantity'].toString(),
-                            onChanged: (val) =>
-                            item['quantity'] = int.tryParse(val) ?? 1,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(hintText: 'Qty'),
+                          Text(item['quantity'].toString()),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: () {
+                              setState(() => item['quantity']++);
+                            },
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => setState(() => clothes.removeAt(index)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    onLongPress: () => setState(() => clothes.removeAt(index)),
                   ),
                 );
               }),
-              TextButton.icon(
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text("Add Item"),
-                onPressed: addClothingItem,
-              ),
               const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: isSubmitting
                       ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.done),
                   label: Text(
                     isSubmitting ? 'Submitting...' : 'Submit & Pickup',
@@ -195,7 +295,9 @@ class _PickupScreenState extends State<PickupScreen> {
                   ),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     backgroundColor: const Color(0xFF6A11CB),
                   ),
                   onPressed: isSubmitting ? null : submitPickup,

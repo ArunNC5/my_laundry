@@ -36,16 +36,16 @@ class SupabaseService {
     final response = await supabase
         .from('orders')
         .insert({
-      'customer_name': customerName,
-      'customer_phone': customerPhone,
-      'customer_address': customerAddress,
-      'agent_name': agentName ?? '',
-      'user_id': userId,
-      'status': status,
-      if (pickupTime != null) 'pickup_time': pickupTime.toIso8601String(),
-      if (deliveryDueTime != null)
-        'delivery_due_time': deliveryDueTime.toIso8601String(),
-    })
+          'customer_name': customerName,
+          'customer_phone': customerPhone,
+          'customer_address': customerAddress,
+          'agent_name': agentName ?? '',
+          'user_id': userId,
+          'status': status,
+          if (pickupTime != null) 'pickup_time': pickupTime.toIso8601String(),
+          if (deliveryDueTime != null)
+            'delivery_due_time': deliveryDueTime.toIso8601String(),
+        })
         .select('id')
         .single();
 
@@ -132,5 +132,18 @@ class SupabaseService {
         .select()
         .eq('order_id', orderId);
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // 🔹 Fetch most recent customer details by phone
+  Future<Map<String, dynamic>?> fetchLatestCustomerByPhone(String phone) async {
+    final response = await supabase
+        .from('orders')
+        .select('customer_name, customer_address')
+        .eq('customer_phone', phone)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    return response;
   }
 }
