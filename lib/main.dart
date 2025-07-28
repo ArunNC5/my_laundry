@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme.dart';
 import 'screens/delivery/delivery_screen.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/pickup/pickup_form.dart';
+import 'screens/pickup/pickup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

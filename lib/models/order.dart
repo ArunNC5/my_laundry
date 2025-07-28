@@ -4,6 +4,7 @@ class Order {
   final String customerName;
   final String customerPhone;
   final String customerAddress;
+  final int totalPrice;
   final String status;
   final DateTime pickupTime;
   final DateTime deliveryDueTime;
@@ -13,6 +14,7 @@ class Order {
     required this.customerName,
     required this.customerPhone,
     required this.customerAddress,
+    required this.totalPrice,
     required this.status,
     required this.pickupTime,
     required this.deliveryDueTime,

@@ -45,7 +45,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _loadOrderItems();
     _loadUPIPreferences();
     _loadPayments();
-    _amountController.text = widget.order['amount']?.toString() ?? '';
+    _amountController.text = widget.order['total_price']?.toString() ?? '';
   }
 
   Future<void> _loadOrderItems() async {
@@ -206,6 +206,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       customerName: order['customer_name'] ?? '',
       customerPhone: order['customer_phone'] ?? '',
       customerAddress: order['customer_address'] ?? '',
+      totalPrice: order['total_price'] ?? '',
       status: order['status'] ?? '',
       pickupTime:
           DateTime.tryParse(order['pickup_time'] ?? '') ?? DateTime.now(),
@@ -260,6 +261,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   _infoRow(
                     'Delivery Status',
                     isDelivered ? 'Delivered ✅' : 'Pending ❌',
+                  ),
+                  _infoRow(
+                    'Total Price',
+                    orderObj.totalPrice.toString(),
                   ),
                 ],
               ),
@@ -582,66 +587,107 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // 🧾 Build PDF
     pdf.addPage(
       pw.Page(
+        pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) => pw.Padding(
           padding: const pw.EdgeInsets.all(24),
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Laundry Bill', style: pw.TextStyle(fontSize: 24)),
-              pw.SizedBox(height: 16),
-              pw.Text('Customer: $customer'),
-              pw.Text('Phone: $phone'),
-              pw.Text('Address: $address'),
-              pw.Text('Order Date: $date'),
-              pw.SizedBox(height: 16),
-              pw.Text(
-                'Items:',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-              pw.SizedBox(height: 8),
-              if (orderItems.isNotEmpty)
-                ...orderItems.map(
-                  (item) => pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(item['item_type'] ?? '-'),
-                      pw.Text('${item['quantity']} pcs'),
-                    ],
+              pw.Center(
+                child: pw.Text(
+                  'Laundry Bill',
+                  style: pw.TextStyle(
+                    fontSize: 26,
+                    fontWeight: pw.FontWeight.bold,
+                    font: font,
                   ),
                 ),
-              pw.SizedBox(height: 16),
-              pw.Divider(),
-              pw.Text(
-                'Total Amount: ₹$amount',
-                style: pw.TextStyle(fontSize: 18, font: font),
               ),
               pw.SizedBox(height: 24),
 
-              // 🔲 Add QR code and link
-              pw.Text(
-                'Scan to Pay via UPI:',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              // Customer info
+              pw.Text('Customer Name: $customer', style: pw.TextStyle(font: font)),
+              pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
+              pw.Text('Address: $address', style: pw.TextStyle(font: font)),
+              pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
+              pw.SizedBox(height: 24),
+
+              // Items
+              pw.Text('Items', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+
+              pw.Table.fromTextArray(
+                headers: ['Item Type', 'Qty', 'Price (₹)'],
+                data: orderItems
+                    .map((item) => [
+                  item['item_type'] ?? '',
+                  '${item['quantity']}',
+                  '${item['item_price'] ?? 0}',
+                ])
+                    .toList(),
+                headerStyle: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  font: font,
+                ),
+                cellStyle: pw.TextStyle(font: font),
+                cellAlignment: pw.Alignment.centerLeft,
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1.5),
+                },
+              ),
+
+              pw.SizedBox(height: 16),
+              pw.Divider(),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Total Amount: ₹$amount',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    font: font,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 24),
+
+              // Payment section
+              pw.Text('Scan to Pay via UPI:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Image(qrImage, width: 150, height: 150),
               ),
               pw.SizedBox(height: 8),
-              pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
-              pw.SizedBox(height: 8),
-              pw.UrlLink(
-                destination: destinationUrl,
-                child: pw.Text(
-                  'Click here to Pay via UPI',
-                  style: pw.TextStyle(
-                    decoration: pw.TextDecoration.underline,
-                    color: PdfColors.blue,
+
+              pw.Center(
+                child: pw.UrlLink(
+                  destination: destinationUrl,
+                  child: pw.Text(
+                    'Tap to Pay via UPI',
+                    style: pw.TextStyle(
+                      decoration: pw.TextDecoration.underline,
+                      color: PdfColors.blue,
+                      font: font,
+                    ),
                   ),
                 ),
               ),
               pw.SizedBox(height: 4),
-              pw.Text(
-                '(If clicking doesn’t work, please scan the QR code)',
-                style: pw.TextStyle(
-                  fontSize: 10,
-                  fontStyle: pw.FontStyle.italic,
-                  font: font,
+              pw.Center(
+                child: pw.Text(
+                  '(If the link doesn’t open, scan the QR code)',
+                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, font: font),
+                ),
+              ),
+
+              pw.SizedBox(height: 24),
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text(
+                  'Thank you for choosing Ayening Kadai!',
+                  style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic, font: font),
                 ),
               ),
             ],
@@ -649,6 +695,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
     );
+
 
     final Uint8List bytes = await pdf.save();
     final output = await getTemporaryDirectory();
@@ -681,6 +728,7 @@ Thank you!
 ''',
     );
   }
+
 
   bool validateRequiredFields({
     required BuildContext context,

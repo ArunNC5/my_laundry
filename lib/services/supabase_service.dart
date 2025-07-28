@@ -27,6 +27,7 @@ class SupabaseService {
     required String customerName,
     required String customerPhone,
     required String customerAddress,
+    required int totalPrice,
     String? agentName,
     String? userId,
     String status = 'pending',
@@ -39,6 +40,7 @@ class SupabaseService {
           'customer_name': customerName,
           'customer_phone': customerPhone,
           'customer_address': customerAddress,
+          'total_price': totalPrice,
           'agent_name': agentName ?? '',
           'user_id': userId,
           'status': status,
@@ -73,12 +75,14 @@ class SupabaseService {
   Future<void> insertOrderItem({
     required String orderId,
     required String itemType,
+    required int itemPrice,
     required int quantity,
     String? notes,
   }) async {
     await supabase.from('order_items').insert({
       'order_id': orderId,
       'item_type': itemType,
+      'item_price': itemPrice,
       'quantity': quantity,
       'notes': notes ?? '',
     });
@@ -145,5 +149,39 @@ class SupabaseService {
         .maybeSingle();
 
     return response;
+  }
+
+  // 🔹 Fetch all services
+  Future<List<Map<String, dynamic>>> fetchAllServices() async {
+    final response = await supabase.from('services').select();
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // 🔹 Fetch services by category
+  Future<List<Map<String, dynamic>>> fetchServicesByCategory(
+    String category,
+  ) async {
+    final response = await supabase
+        .from('services')
+        .select()
+        .eq('category', category)
+        .order('name', ascending: true);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // 🔹 Insert a new service (admin use only)
+  Future<void> insertService({
+    required String name,
+    required int price,
+    required String category,
+    String? iconUrl,
+  }) async {
+    await supabase.from('services').insert({
+      'name': name,
+      'price': price,
+      'category': category,
+      if (iconUrl != null) 'icon_url': iconUrl,
+    });
   }
 }
