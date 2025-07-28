@@ -31,8 +31,7 @@ class _PickupScreenState extends State<PickupScreen> {
   void addClothingItem(Map<String, dynamic> item) {
     setState(() {
       final index = clothes.indexWhere(
-        (c) =>
-            c['name'] == item['name'] && c['category'] == item['category'],
+        (c) => c['name'] == item['name'] && c['category'] == item['category'],
       );
 
       if (index != -1) {
@@ -305,7 +304,7 @@ class _PickupScreenState extends State<PickupScreen> {
                               IconButton(
                                 icon: const Icon(
                                   Icons.remove_circle_outline,
-                                  size: 18,
+                                  size: 32,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -324,11 +323,18 @@ class _PickupScreenState extends State<PickupScreen> {
                                   });
                                 },
                               ),
-                              Text('$quantity'),
+                              Text(
+                                '$quantity',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+
                               IconButton(
                                 icon: const Icon(
                                   Icons.add_circle_outline,
-                                  size: 18,
+                                  size: 32,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -427,7 +433,10 @@ class _PickupScreenState extends State<PickupScreen> {
                       icon: const Icon(Icons.add, size: 20),
                       label: const Text(
                         "Add Custom Item",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6A11CB),
