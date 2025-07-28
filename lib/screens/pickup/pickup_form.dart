@@ -44,7 +44,9 @@ class _PickupScreenState extends State<PickupScreen> {
 
   Future<void> fetchAndPrefillCustomer(String phone) async {
     if (phone.length < 10) return;
-    final existingCustomer = await supabaseService.fetchLatestCustomerByPhone(phone);
+    final existingCustomer = await supabaseService.fetchLatestCustomerByPhone(
+      phone,
+    );
     print('Fetched customer: $existingCustomer');
 
     if (existingCustomer != null) {
@@ -192,51 +194,120 @@ class _PickupScreenState extends State<PickupScreen> {
                   crossAxisCount: 4,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: 1,
+                  childAspectRatio: 0.75, // Reduce if content is tall
                 ),
                 itemBuilder: (context, index) {
                   final item = itemTypes[index];
+                  final existing = clothes.firstWhere(
+                        (c) => c['item_type'] == item['label'],
+                    orElse: () => {},
+                  );
+                  final isSelected = existing.isNotEmpty;
+                  final quantity = existing['quantity'] ?? 0;
+
                   return InkWell(
                     onTap: () {
                       if (item['label'] == 'Custom') {
                         showCustomItemDialog();
                       } else {
-                        addClothingItem(item['label']);
+                        setState(() {
+                          final existingItemIndex = clothes.indexWhere(
+                                (c) => c['item_type'] == item['label'],
+                          );
+
+                          if (existingItemIndex != -1) {
+                            clothes[existingItemIndex]['quantity']++;
+                          } else {
+                            clothes.add({'item_type': item['label'], 'quantity': 1});
+                          }
+                        });
                       }
                     },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 1,
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                spreadRadius: 1,
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            item['iconPath'],
-                            width: 30,
-                            height: 30,
-                            color: const Color(0xFF6A11CB),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                item['iconPath'],
+                                width: 30,
+                                height: 30,
+                                color: const Color(0xFF6A11CB),
+                              ),
+                              const SizedBox(height: 4),
+                              Flexible(
+                                child: Text(
+                                  item['label'],
+                                  style: const TextStyle(fontSize: 12),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (isSelected)
+                                Flexible(
+                                  child: FittedBox(
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle_outline, size: 18),
+                                          onPressed: () {
+                                            setState(() {
+                                              final idx = clothes.indexWhere(
+                                                    (c) => c['item_type'] == item['label'],
+                                              );
+                                              if (idx != -1) {
+                                                if (clothes[idx]['quantity'] > 1) {
+                                                  clothes[idx]['quantity']--;
+                                                } else {
+                                                  clothes.removeAt(idx);
+                                                }
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        Text('$quantity'),
+                                        IconButton(
+                                          icon: const Icon(Icons.add_circle_outline, size: 18),
+                                          onPressed: () {
+                                            setState(() {
+                                              final idx = clothes.indexWhere(
+                                                    (c) => c['item_type'] == item['label'],
+                                              );
+                                              if (idx != -1) {
+                                                clothes[idx]['quantity']++;
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            item['label'],
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   );
                 },
-              ),
+              )
+              ,
               const SizedBox(height: 20),
               const Text(
                 "Selected Items",

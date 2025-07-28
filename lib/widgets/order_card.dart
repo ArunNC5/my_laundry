@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
 class OrderCard extends StatelessWidget {
   final Map order;
   final VoidCallback onViewDetails;
 
-  const OrderCard({
-    required this.order,
-    required this.onViewDetails,
-    Key? key,
-  }) : super(key: key);
+  const OrderCard({required this.order, required this.onViewDetails, Key? key})
+    : super(key: key);
 
   String formatDate(String? iso) {
     try {
@@ -45,10 +39,7 @@ class OrderCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.8),
-            Colors.grey[100]!,
-          ],
+          colors: [Colors.white.withOpacity(0.8), Colors.grey[100]!],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -86,7 +77,10 @@ class OrderCard extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: isDelivered
@@ -128,7 +122,11 @@ class OrderCard extends StatelessWidget {
                 if (pickupTime != null && pickupTime.isNotEmpty)
                   Row(
                     children: [
-                      Icon(Icons.local_shipping, color: Colors.grey[700], size: 18),
+                      Icon(
+                        Icons.local_shipping,
+                        color: Colors.grey[700],
+                        size: 18,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Pickup: ${formatDate(pickupTime)}',
@@ -137,14 +135,17 @@ class OrderCard extends StatelessWidget {
                     ],
                   ),
 
-                if (pickupTime != null && pickupTime.isNotEmpty) const SizedBox(height: 8),
+                if (pickupTime != null && pickupTime.isNotEmpty)
+                  const SizedBox(height: 8),
 
                 // Due Time / Overdue
                 if (!isDelivered && dueTime != null && dueTime.isNotEmpty)
                   Row(
                     children: [
                       Icon(
-                        overdue ? Icons.warning_amber_rounded : Icons.calendar_today_outlined,
+                        overdue
+                            ? Icons.warning_amber_rounded
+                            : Icons.calendar_today_outlined,
                         color: overdue ? Colors.red : Colors.blueGrey[700],
                         size: 18,
                       ),
@@ -156,7 +157,9 @@ class OrderCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           color: overdue ? Colors.red : Colors.black87,
-                          fontWeight: overdue ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: overdue
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ],

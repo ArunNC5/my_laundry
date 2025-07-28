@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -376,17 +377,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               child: ElevatedButton.icon(
                                 onPressed: () {
                                   final amount = _amountController.text.trim();
-                                  if (amount.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Please enter total amount before generating UPI QR.',
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                    return;
-                                  }
+                                  final upiId = _upiIdController.text.trim();
+                                  final upiName = _upiNameController.text
+                                      .trim();
+
+                                  bool isValid = validateRequiredFields(
+                                    context: context,
+                                    fields: [amount, upiId, upiName],
+                                    fieldNames: [
+                                      'total amount',
+                                      'UPI ID',
+                                      'UPI name',
+                                    ],
+                                  );
+
+                                  if (!isValid) return;
                                   _generateQr;
                                 },
                                 icon: const Icon(Icons.qr_code),
@@ -426,17 +431,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               child: ElevatedButton.icon(
                                 onPressed: () {
                                   final amount = _amountController.text.trim();
-                                  if (amount.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Please enter total amount before sharing PDF.',
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                    return;
-                                  }
+                                  final upiId = _upiIdController.text.trim();
+                                  final upiName = _upiNameController.text
+                                      .trim();
+
+                                  bool isValid = validateRequiredFields(
+                                    context: context,
+                                    fields: [amount, upiId, upiName],
+                                    fieldNames: [
+                                      'total amount',
+                                      'UPI ID',
+                                      'UPI name',
+                                    ],
+                                  );
+
+                                  if (!isValid) return;
 
                                   _sharePdfBill(); // Only called if amount is present
                                 },
@@ -551,8 +560,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final upiId = _upiIdController.text.trim();
     final upiName = _upiNameController.text.trim();
     final upiUrl = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
+    final destinationUrl =
+        'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-    /// 🔲 Generate UPI QR as image
+    // 🔲 Generate UPI QR as image
     final qrValidationResult = QrValidator.validate(
       data: upiUrl,
       version: QrVersions.auto,
@@ -565,11 +576,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       emptyColor: const ui.Color(0xFFFFFFFF),
       gapless: true,
     );
-
-    final picData = await painter.toImageData(200); // 200px image
+    final picData = await painter.toImageData(200);
     final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
 
-    /// 🧾 Build PDF
+    // 🧾 Build PDF
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) => pw.Padding(
@@ -603,11 +613,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.Divider(),
               pw.Text(
                 'Total Amount: ₹$amount',
-                style: pw.TextStyle(font: font, fontSize: 18),
+                style: pw.TextStyle(fontSize: 18, font: font),
               ),
               pw.SizedBox(height: 24),
 
-              /// 🔲 Add QR code
+              // 🔲 Add QR code and link
               pw.Text(
                 'Scan to Pay via UPI:',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -615,6 +625,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.SizedBox(height: 8),
               pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
               pw.SizedBox(height: 8),
+              pw.UrlLink(
+                destination: destinationUrl,
+                child: pw.Text(
+                  'Click here to Pay via UPI',
+                  style: pw.TextStyle(
+                    decoration: pw.TextDecoration.underline,
+                    color: PdfColors.blue,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                '(If clicking doesn’t work, please scan the QR code)',
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontStyle: pw.FontStyle.italic,
+                  font: font,
+                ),
+              ),
             ],
           ),
         ),
@@ -626,8 +655,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final file = File('${output.path}/laundry_bill.pdf');
     await file.writeAsBytes(bytes);
 
-    await Share.shareXFiles([
-      XFile(file.path),
-    ], text: 'Here is your laundry bill.');
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text:
+          '''
+🧾 Your Laundry Bill
+
+Hello 👋,
+Thank you for choosing our laundry service!
+
+🧍 Customer Name: $customer
+💰 Amount Due: ₹$amount
+📅 Bill Date: $date
+
+To make payment, please scan the QR in the attached PDF.
+
+⚠️ If your device does not support UPI deep links in PDFs, you can tap the link below to pay directly:
+
+👉 https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR
+
+Once payment is done, please reply with "Paid" for confirmation. ✅
+
+Thank you!
+— Ayening Kadai
+''',
+    );
+  }
+
+  bool validateRequiredFields({
+    required BuildContext context,
+    required List<String> fields,
+    required List<String> fieldNames,
+  }) {
+    for (int i = 0; i < fields.length; i++) {
+      if (fields[i].trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please enter ${fieldNames[i]}.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+    }
+    return true;
   }
 }
