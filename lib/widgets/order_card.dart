@@ -1,8 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-class OrderCard extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+class OrderCard extends StatelessWidget {
   final Map order;
   final VoidCallback onViewDetails;
 
@@ -12,82 +14,31 @@ class OrderCard extends StatefulWidget {
     Key? key,
   }) : super(key: key);
 
-  @override
-  State<OrderCard> createState() => _OrderCardState();
-}
-
-class _OrderCardState extends State<OrderCard> {
-  late Timer _timer;
-  String _countdown = '';
-  Color _countdownColor = Colors.grey;
-
-  @override
-  void initState() {
-    super.initState();
-    _startCountdown();
-  }
-
-  void _startCountdown() {
-    if (widget.order['status'] == 'delivered') return;
-
-    _updateCountdown();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateCountdown());
-  }
-
-  void _updateCountdown() {
-    final iso = widget.order['delivery_due_time'];
-    if (iso == null) return;
-
-    final due = DateTime.tryParse(iso)?.toLocal();
-    if (due == null) return;
-
-    final now = DateTime.now();
-    final diff = due.difference(now);
-
-    if (!mounted) return;
-
-    setState(() {
-      if (diff.isNegative) {
-        _countdown = 'Overdue';
-        _countdownColor = Colors.red;
-      } else {
-        final days = diff.inDays;
-        final hours = diff.inHours % 24;
-        final mins = diff.inMinutes % 60;
-        final secs = diff.inSeconds % 60;
-
-        _countdown =
-        '${days}d ${hours}h ${mins.toString().padLeft(2, '0')}m ${secs.toString().padLeft(2, '0')}s left';
-
-        if (diff.inMinutes < 60) {
-          _countdownColor = Colors.deepOrange;
-        } else {
-          _countdownColor = Colors.grey[800]!;
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  String formatDate(String iso) {
+  String formatDate(String? iso) {
     try {
-      final dt = DateTime.parse(iso).toLocal();
+      final dt = DateTime.parse(iso ?? '').toLocal();
       return DateFormat('dd MMM, hh:mm a').format(dt);
     } catch (_) {
       return '';
     }
   }
 
+  bool isOverdue(String? iso) {
+    try {
+      final due = DateTime.parse(iso ?? '').toLocal();
+      return DateTime.now().isAfter(due);
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
     final status = order['status'] ?? 'unknown';
     final isDelivered = status == 'delivered';
+    final pickupTime = order['pickup_time'] as String?;
+    final dueTime = order['delivery_due_time'] as String?;
+    final overdue = !isDelivered && isOverdue(dueTime);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -113,14 +64,14 @@ class _OrderCardState extends State<OrderCard> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          onTap: widget.onViewDetails,
+          onTap: onViewDetails,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name and status
+                // Name and Status
                 Row(
                   children: [
                     Expanded(
@@ -135,8 +86,7 @@ class _OrderCardState extends State<OrderCard> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: isDelivered
@@ -157,6 +107,7 @@ class _OrderCardState extends State<OrderCard> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
 
                 // Phone
@@ -170,33 +121,43 @@ class _OrderCardState extends State<OrderCard> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 10),
 
                 // Pickup Time
-                if (order['pickup_time'] != null)
+                if (pickupTime != null && pickupTime.isNotEmpty)
                   Row(
                     children: [
-                      Icon(Icons.local_shipping,
-                          color: Colors.grey[700], size: 18),
+                      Icon(Icons.local_shipping, color: Colors.grey[700], size: 18),
                       const SizedBox(width: 6),
                       Text(
-                        'Pickup: ${formatDate(order['pickup_time'])}',
+                        'Pickup: ${formatDate(pickupTime)}',
                         style: TextStyle(fontSize: 15, color: Colors.grey[800]),
                       ),
                     ],
                   ),
-                const SizedBox(height: 8),
 
-                // Countdown
-                if (!isDelivered && _countdown.isNotEmpty)
+                if (pickupTime != null && pickupTime.isNotEmpty) const SizedBox(height: 8),
+
+                // Due Time / Overdue
+                if (!isDelivered && dueTime != null && dueTime.isNotEmpty)
                   Row(
                     children: [
-                      Icon(Icons.timer_outlined,
-                          color: _countdownColor, size: 18),
+                      Icon(
+                        overdue ? Icons.warning_amber_rounded : Icons.calendar_today_outlined,
+                        color: overdue ? Colors.red : Colors.blueGrey[700],
+                        size: 18,
+                      ),
                       const SizedBox(width: 6),
                       Text(
-                        _countdown,
-                        style: TextStyle(fontSize: 15, color: _countdownColor),
+                        overdue
+                            ? 'Overdue since: ${formatDate(dueTime)}'
+                            : 'Due by: ${formatDate(dueTime)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: overdue ? Colors.red : Colors.black87,
+                          fontWeight: overdue ? FontWeight.w600 : FontWeight.normal,
+                        ),
                       ),
                     ],
                   ),

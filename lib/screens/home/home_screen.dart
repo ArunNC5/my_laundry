@@ -72,12 +72,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     final order = orders[index];
                     return OrderCard(
                       order: order,
-                      onViewDetails: () {
-                        Navigator.pushNamed(
+                      onViewDetails: () async {
+                        final result = await Navigator.pushNamed(
                           context,
                           '/order_detail',
                           arguments: order,
                         );
+                        if (result == true) {
+                          fetchOrderList();
+                        }
                       },
                     );
                   },

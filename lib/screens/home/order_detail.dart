@@ -1,6 +1,13 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/order.dart';
@@ -116,71 +123,78 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildUPICard() {
     return _editUPI
         ? Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _upiIdController,
-          decoration: const InputDecoration(
-            labelText: 'UPI ID',
-            border: OutlineInputBorder(),
-          ),
-          validator: (val) => val!.isEmpty ? 'Enter UPI ID' : null,
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _upiNameController,
-          decoration: const InputDecoration(
-            labelText: 'UPI Name',
-            border: OutlineInputBorder(),
-          ),
-          validator: (val) => val!.isEmpty ? 'Enter name' : null,
-        ),
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString(
-                  'upi_id', _upiIdController.text.trim());
-              await prefs.setString(
-                  'upi_name', _upiNameController.text.trim());
-              setState(() => _editUPI = false);
-            },
-            icon: const Icon(Icons.save),
-            label: const Text('Save'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              textStyle: const TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      ],
-    )
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _upiIdController,
+                decoration: const InputDecoration(
+                  labelText: 'UPI ID',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Enter UPI ID' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _upiNameController,
+                decoration: const InputDecoration(
+                  labelText: 'UPI Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => val!.isEmpty ? 'Enter name' : null,
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString(
+                      'upi_id',
+                      _upiIdController.text.trim(),
+                    );
+                    await prefs.setString(
+                      'upi_name',
+                      _upiNameController.text.trim(),
+                    );
+                    setState(() => _editUPI = false);
+                  },
+                  icon: const Icon(Icons.save),
+                  label: const Text('Save'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          )
         : Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'UPI ID: ${_upiIdController.text}',
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'UPI ID: ${_upiIdController.text}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _editUPI = true),
+                    child: const Text('Edit'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Name: ${_upiNameController.text}',
                 style: const TextStyle(fontSize: 16),
               ),
-            ),
-            TextButton(
-              onPressed: () => setState(() => _editUPI = true),
-              child: const Text('Edit'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Name: ${_upiNameController.text}',
-          style: const TextStyle(fontSize: 16),
-        ),
-      ],
-    );
+            ],
+          );
   }
 
   @override
@@ -289,7 +303,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             if (!isDelivered) ...[
               Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -304,7 +320,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               alignment: Alignment.centerLeft,
                               child: Text(
                                 'Payment Collection',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -312,7 +331,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _amountController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               decoration: const InputDecoration(
                                 labelText: 'Enter payment amount (₹)',
                                 border: OutlineInputBorder(),
@@ -336,7 +358,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   children: [
                                     const Text(
                                       'Scan to Pay',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     QrImageView(data: _upiUrl!, size: 200),
@@ -349,11 +374,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton.icon(
-                                onPressed: _generateQr,
+                                onPressed: () {
+                                  final amount = _amountController.text.trim();
+                                  if (amount.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please enter total amount before generating UPI QR.',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _generateQr;
+                                },
                                 icon: const Icon(Icons.qr_code),
                                 label: const Text('Generate UPI QR'),
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   textStyle: const TextStyle(fontSize: 16),
                                 ),
                               ),
@@ -362,13 +403,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: _isLoading
-                                  ? const Center(child: CircularProgressIndicator())
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
                                   : ElevatedButton.icon(
-                                icon: const Icon(Icons.done_all),
-                                label: const Text('Mark as Delivered'),
-                                onPressed: _markAsDelivered,
+                                      icon: const Icon(Icons.done_all),
+                                      label: const Text('Mark as Delivered'),
+                                      onPressed: _markAsDelivered,
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        textStyle: const TextStyle(
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  final amount = _amountController.text.trim();
+                                  if (amount.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please enter total amount before sharing PDF.',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  _sharePdfBill(); // Only called if amount is present
+                                },
+                                icon: const Icon(Icons.picture_as_pdf),
+                                label: const Text('Share Bill PDF'),
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                   textStyle: const TextStyle(fontSize: 16),
                                 ),
                               ),
@@ -455,5 +532,102 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _sharePdfBill() async {
+    final pdf = pw.Document();
+    final font = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+    );
+
+    final customer = widget.order['customer_name'];
+    final phone = widget.order['customer_phone'];
+    final address = widget.order['customer_address'];
+    final amount = _amountController.text;
+    final date = DateFormat('dd MMM yyyy, hh:mm a').format(
+      DateTime.tryParse(widget.order['created_at'] ?? '') ?? DateTime.now(),
+    );
+
+    final upiId = _upiIdController.text.trim();
+    final upiName = _upiNameController.text.trim();
+    final upiUrl = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
+
+    /// 🔲 Generate UPI QR as image
+    final qrValidationResult = QrValidator.validate(
+      data: upiUrl,
+      version: QrVersions.auto,
+      errorCorrectionLevel: QrErrorCorrectLevel.M,
+    );
+    final qrCode = qrValidationResult.qrCode;
+    final painter = QrPainter.withQr(
+      qr: qrCode!,
+      color: const ui.Color(0xFF000000),
+      emptyColor: const ui.Color(0xFFFFFFFF),
+      gapless: true,
+    );
+
+    final picData = await painter.toImageData(200); // 200px image
+    final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
+
+    /// 🧾 Build PDF
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Laundry Bill', style: pw.TextStyle(fontSize: 24)),
+              pw.SizedBox(height: 16),
+              pw.Text('Customer: $customer'),
+              pw.Text('Phone: $phone'),
+              pw.Text('Address: $address'),
+              pw.Text('Order Date: $date'),
+              pw.SizedBox(height: 16),
+              pw.Text(
+                'Items:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              if (orderItems.isNotEmpty)
+                ...orderItems.map(
+                  (item) => pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(item['item_type'] ?? '-'),
+                      pw.Text('${item['quantity']} pcs'),
+                    ],
+                  ),
+                ),
+              pw.SizedBox(height: 16),
+              pw.Divider(),
+              pw.Text(
+                'Total Amount: ₹$amount',
+                style: pw.TextStyle(font: font, fontSize: 18),
+              ),
+              pw.SizedBox(height: 24),
+
+              /// 🔲 Add QR code
+              pw.Text(
+                'Scan to Pay via UPI:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
+              pw.SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final Uint8List bytes = await pdf.save();
+    final output = await getTemporaryDirectory();
+    final file = File('${output.path}/laundry_bill.pdf');
+    await file.writeAsBytes(bytes);
+
+    await Share.shareXFiles([
+      XFile(file.path),
+    ], text: 'Here is your laundry bill.');
   }
 }
