@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // import 'package:shared_preferences/shared_preferences.dart'; // REMOVED
 
@@ -283,12 +284,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, // This aligns the Form to the start
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    // This aligns the Form to the start
                     children: [
                       Form(
                         key: _formKey,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start, // <-- Add this line here to align the UPI details
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          // <-- Add this line here to align the UPI details
                           children: [
                             const Align(
                               alignment: Alignment.centerLeft,
@@ -316,9 +319,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             TextFormField(
                               controller: _amountController,
                               keyboardType:
-                              const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               decoration: const InputDecoration(
                                 labelText: 'Enter payment amount (₹)',
                                 border: OutlineInputBorder(),
@@ -392,21 +395,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               width: double.infinity,
                               child: _isLoading
                                   ? const Center(
-                                child: CircularProgressIndicator(),
-                              )
+                                      child: CircularProgressIndicator(),
+                                    )
                                   : ElevatedButton.icon(
-                                icon: const Icon(Icons.done_all),
-                                label: const Text('Mark as Delivered'),
-                                onPressed: _markAsDelivered,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
+                                      icon: const Icon(Icons.done_all),
+                                      label: const Text('Mark as Delivered'),
+                                      onPressed: _markAsDelivered,
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        textStyle: const TextStyle(
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -699,10 +702,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final file = File('${output.path}/laundry_bill.pdf');
     await file.writeAsBytes(bytes);
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text:
-          '''
+    final billMessage =
+        '''
 🧾 Your Laundry Bill
 
 Hello 👋,
@@ -722,8 +723,54 @@ Once payment is done, please reply with "Paid" for confirmation. ✅
 
 Thank you!
 — Ayening Kadai
-''',
-    );
+''';
+
+    if (Platform.isAndroid) {
+      // Step 1: Share PDF first
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+
+      // Step 2: Prompt user to send message via WhatsApp
+      final shouldSendText = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Send Message?"),
+          content: const Text(
+            "Do you want to send the payment instructions on WhatsApp too?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("No"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Yes"),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSendText == true) {
+        final encodedText = Uri.encodeComponent(billMessage);
+        final whatsappUrl = Uri.parse('https://wa.me/?text=$encodedText');
+
+        if (await canLaunchUrl(whatsappUrl)) {
+          await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Could not open WhatsApp")),
+          );
+        }
+      }
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      // ✅ Share PDF + Text together
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: billMessage),
+      );
+    } else {
+      // Fallback for unsupported platforms
+      print("Sharing is not supported on this platform.");
+    }
   }
 
   bool validateRequiredFields({
