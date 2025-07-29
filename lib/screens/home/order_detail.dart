@@ -9,7 +9,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+// import 'package:shared_preferences/shared_preferences.dart'; // REMOVED
 
 import '../../models/order.dart';
 import '../../services/supabase_service.dart';
@@ -35,7 +36,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<Map<String, dynamic>> payments = [];
   bool isLoadingItems = true;
   bool _isLoading = false;
-  bool _editUPI = false;
+
+  // bool _editUPI = false; // REMOVED: No longer needed
   bool isLoadingPayments = true;
   String? _upiUrl;
 
@@ -43,9 +45,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _loadOrderItems();
-    _loadUPIPreferences();
     _loadPayments();
     _amountController.text = widget.order['total_price']?.toString() ?? '';
+    _loadUpiDetailsFromSupabase(); // New method to load UPI details
+  }
+
+  // New method to fetch UPI details from Supabase
+  Future<void> _loadUpiDetailsFromSupabase() async {
+    try {
+      final upiData = await supabaseService.fetchUPIDetails();
+      setState(() {
+        _upiIdController.text = upiData?['upi_id'] ?? '9962661626@upi';
+        _upiNameController.text = upiData?['upi_name'] ?? 'Satish V';
+      });
+    } catch (e) {
+      // Handle error, e.g., show a SnackBar or log it
+      print('Error fetching UPI details: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading UPI details: $e')));
+    }
   }
 
   Future<void> _loadOrderItems() async {
@@ -66,19 +85,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
-  Future<void> _loadUPIPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    _upiIdController.text = prefs.getString('upi_id') ?? '';
-    _upiNameController.text = prefs.getString('upi_name') ?? '';
-    setState(() {});
-  }
+  // REMOVED: _loadUPIPreferences() method is no longer needed
 
   void _generateQr() {
     final amount = _amountController.text.trim();
     final upiId = _upiIdController.text.trim();
     final upiName = _upiNameController.text.trim();
 
-    if (amount.isEmpty || upiId.isEmpty || upiName.isEmpty) return;
+    // The validation for these fields will now primarily check if Supabase returned them.
+    // If Supabase returns empty, the validation will still catch it.
+    if (amount.isEmpty || upiId.isEmpty || upiName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'UPI ID, Name, or Amount cannot be empty to generate QR.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     final url = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
     setState(() => _upiUrl = url);
@@ -122,80 +148,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildUPICard() {
-    return _editUPI
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _upiIdController,
-                decoration: const InputDecoration(
-                  labelText: 'UPI ID',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (val) => val!.isEmpty ? 'Enter UPI ID' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _upiNameController,
-                decoration: const InputDecoration(
-                  labelText: 'UPI Name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (val) => val!.isEmpty ? 'Enter name' : null,
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString(
-                      'upi_id',
-                      _upiIdController.text.trim(),
-                    );
-                    await prefs.setString(
-                      'upi_name',
-                      _upiNameController.text.trim(),
-                    );
-                    setState(() => _editUPI = false);
-                  },
-                  icon: const Icon(Icons.save),
-                  label: const Text('Save'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    textStyle: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'UPI ID: ${_upiIdController.text}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() => _editUPI = true),
-                    child: const Text('Edit'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Name: ${_upiNameController.text}',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ],
-          );
+    // Simplified: Always display, no edit mode
+    return Column(
+      // Removed Center widget wrapper
+      crossAxisAlignment: CrossAxisAlignment.start, // Changed back to start
+      children: [
+        Text(
+          'UPI ID: ${_upiIdController.text.isNotEmpty ? _upiIdController.text : 'Loading...'}',
+          style: const TextStyle(fontSize: 16),
+          // Removed textAlign: TextAlign.center
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Name: ${_upiNameController.text.isNotEmpty ? _upiNameController.text : 'Loading...'}',
+          style: const TextStyle(fontSize: 16),
+          // Removed textAlign: TextAlign.center
+        ),
+      ],
+    );
   }
 
   @override
@@ -262,10 +232,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     'Delivery Status',
                     isDelivered ? 'Delivered ✅' : 'Pending ❌',
                   ),
-                  _infoRow(
-                    'Total Price',
-                    orderObj.totalPrice.toString(),
-                  ),
+                  _infoRow('Total Price', orderObj.totalPrice.toString()),
                 ],
               ),
             ),
@@ -316,11 +283,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start, // This aligns the Form to the start
                     children: [
                       Form(
                         key: _formKey,
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start, // <-- Add this line here to align the UPI details
                           children: [
                             const Align(
                               alignment: Alignment.centerLeft,
@@ -333,14 +301,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            _buildUPICard(),
+                            Text(
+                              'UPI ID: ${_upiIdController.text.isNotEmpty ? _upiIdController.text : 'Loading...'}',
+                              style: const TextStyle(fontSize: 16),
+                              // textAlign: TextAlign.start, // Optional: Can remove as crossAxisAlignment handles it
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Name: ${_upiNameController.text.isNotEmpty ? _upiNameController.text : 'Loading...'}',
+                              style: const TextStyle(fontSize: 16),
+                              // textAlign: TextAlign.start, // Optional: Can remove as crossAxisAlignment handles it
+                            ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _amountController,
                               keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                              const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
                               decoration: const InputDecoration(
                                 labelText: 'Enter payment amount (₹)',
                                 border: OutlineInputBorder(),
@@ -397,7 +375,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   );
 
                                   if (!isValid) return;
-                                  _generateQr;
+                                  _generateQr(); // Corrected call
                                 },
                                 icon: const Icon(Icons.qr_code),
                                 label: const Text('Generate UPI QR'),
@@ -414,21 +392,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               width: double.infinity,
                               child: _isLoading
                                   ? const Center(
-                                      child: CircularProgressIndicator(),
-                                    )
+                                child: CircularProgressIndicator(),
+                              )
                                   : ElevatedButton.icon(
-                                      icon: const Icon(Icons.done_all),
-                                      label: const Text('Mark as Delivered'),
-                                      onPressed: _markAsDelivered,
-                                      style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        textStyle: const TextStyle(
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
+                                icon: const Icon(Icons.done_all),
+                                label: const Text('Mark as Delivered'),
+                                onPressed: _markAsDelivered,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -452,7 +430,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
                                   if (!isValid) return;
 
-                                  _sharePdfBill(); // Only called if amount is present
+                                  _sharePdfBill();
                                 },
                                 icon: const Icon(Icons.picture_as_pdf),
                                 label: const Text('Share Bill PDF'),
@@ -606,24 +584,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.SizedBox(height: 24),
 
               // Customer info
-              pw.Text('Customer Name: $customer', style: pw.TextStyle(font: font)),
+              pw.Text(
+                'Customer Name: $customer',
+                style: pw.TextStyle(font: font),
+              ),
               pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
               pw.Text('Address: $address', style: pw.TextStyle(font: font)),
               pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
               pw.SizedBox(height: 24),
 
               // Items
-              pw.Text('Items', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Items',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 8),
 
               pw.Table.fromTextArray(
                 headers: ['Item Type', 'Qty', 'Price (₹)'],
                 data: orderItems
-                    .map((item) => [
-                  item['item_type'] ?? '',
-                  '${item['quantity']}',
-                  '${item['item_price'] ?? 0}',
-                ])
+                    .map(
+                      (item) => [
+                        item['item_type'] ?? '',
+                        '${item['quantity']}',
+                        '${item['item_price'] ?? 0}',
+                      ],
+                    )
                     .toList(),
                 headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
@@ -654,11 +643,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.SizedBox(height: 24),
 
               // Payment section
-              pw.Text('Scan to Pay via UPI:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 8),
-              pw.Center(
-                child: pw.Image(qrImage, width: 150, height: 150),
+              pw.Text(
+                'Scan to Pay via UPI:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
               ),
+              pw.SizedBox(height: 8),
+              pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
               pw.SizedBox(height: 8),
 
               pw.Center(
@@ -678,7 +668,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.Center(
                 child: pw.Text(
                   '(If the link doesn’t open, scan the QR code)',
-                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, font: font),
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontStyle: pw.FontStyle.italic,
+                    font: font,
+                  ),
                 ),
               ),
 
@@ -687,7 +681,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.Center(
                 child: pw.Text(
                   'Thank you for choosing Ayening Kadai!',
-                  style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic, font: font),
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontStyle: pw.FontStyle.italic,
+                    font: font,
+                  ),
                 ),
               ),
             ],
@@ -695,7 +693,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
     );
-
 
     final Uint8List bytes = await pdf.save();
     final output = await getTemporaryDirectory();
@@ -728,7 +725,6 @@ Thank you!
 ''',
     );
   }
-
 
   bool validateRequiredFields({
     required BuildContext context,

@@ -184,4 +184,17 @@ class SupabaseService {
       if (iconUrl != null) 'icon_url': iconUrl,
     });
   }
+
+  // 🔹 Fetch UPI Details
+  Future<Map<String, dynamic>?> fetchUPIDetails() async {
+    final response = await supabase
+        .from('upi_details')
+        .select()
+        .order('created_at', ascending: false)
+        .limit(1)
+        .single();
+
+    return response;
+  }
+
 }
