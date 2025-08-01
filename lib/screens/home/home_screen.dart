@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
         title: const Text(
-          'MyLaundry',
+          'Orders',
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 22,

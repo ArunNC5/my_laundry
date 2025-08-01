@@ -185,6 +185,27 @@ class SupabaseService {
     });
   }
 
+  Future<void> updateService({
+    required String id,
+    required String name,
+    required int price,
+    required String category,
+    String? iconUrl,
+  }) async {
+    final updateData = {
+      'name': name,
+      'price': price,
+      'category': category,
+      if (iconUrl != null) 'icon_url': iconUrl,
+    };
+
+    await supabase.from('services').update(updateData).eq('id', id);
+  }
+
+  Future<void> deleteService(String id) async {
+    await supabase.from('services').delete().eq('id', id);
+  }
+
   // 🔹 Fetch UPI Details
   Future<Map<String, dynamic>?> fetchUPIDetails() async {
     final response = await supabase
@@ -197,4 +218,42 @@ class SupabaseService {
     return response;
   }
 
+  Future<bool> updateUPIDetailsWithPin({
+    required String id,
+    required String upiId,
+    required String upiName,
+    required String enteredPin,
+  }) async {
+    // Fetch the existing row with matching ID
+    final existing = await supabase
+        .from('upi_details')
+        .select('pin')
+        .eq('id', id)
+        .single();
+
+    if (existing == null || existing['pin'] != enteredPin) {
+      // PIN mismatch
+      return false;
+    }
+
+    // Update only if PIN matches
+    await supabase
+        .from('upi_details')
+        .update({'upi_id': upiId, 'upi_name': upiName})
+        .eq('id', id);
+
+    return true;
+  }
+
+  Future<void> insertUPIDetails({
+    required String upiId,
+    required String upiName,
+    required String pin,
+  }) async {
+    await supabase.from('upi_details').insert({
+      'upi_id': upiId,
+      'upi_name': upiName,
+      'pin': pin,
+    });
+  }
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:my_laundry/screens/home/order_detail.dart';
+import 'package:my_laundry/screens/pickup/pickup_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme.dart';
+import 'main_navigation_screen.dart';
 import 'screens/delivery/delivery_screen.dart';
-import 'screens/home/home_screen.dart';
-import 'screens/pickup/pickup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,9 +25,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MyLaundry',
       theme: appTheme,
-      initialRoute: '/',
+      home: MainNavigationScreen(),
       routes: {
-        '/': (context) => HomeScreen(),
         '/pickup': (context) => PickupScreen(),
         '/delivery': (context) {
           final order =
