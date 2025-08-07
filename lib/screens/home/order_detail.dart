@@ -1,20 +1,25 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // import 'package:shared_preferences/shared_preferences.dart'; // REMOVED
 
 import '../../models/order.dart';
 import '../../services/supabase_service.dart';
+
+const phoneNumberId = '691124614092250';
+const accessToken =
+    'EAASgUfHkTxUBPPz5KdLY8LuaToHPH77oyDR9AaCl8Ud7ntileuygM8kaB5lPukM4H2Un7HyZBtw4ASo0BgLvktqnffnMLnhY0KnozYZC5In7ovggl8Y0OGT19EuaGYoEPZA8xxVMURFvU6dnQfvhTKqZAtJf3vqoOFxHzZBoVGvGo8qHbUxCZB7A3ZCfGZBXqd2P6gZDZD';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -529,6 +534,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  bool validateRequiredFields({
+    required BuildContext context,
+    required List<String> fields,
+    required List<String> fieldNames,
+  }) {
+    for (int i = 0; i < fields.length; i++) {
+      if (fields[i].trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please enter ${fieldNames[i]}.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _sharePdfBill() async {
     final pdf = pw.Document();
     final font = pw.Font.ttf(
@@ -536,7 +560,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     final customer = widget.order['customer_name'];
-    final phone = widget.order['customer_phone'];
+    final phone = widget.order['customer_phone']; // Should be 91xxxxxxxxxx
     final address = widget.order['customer_address'];
     final amount = _amountController.text;
     final date = DateFormat('dd MMM yyyy, hh:mm a').format(
@@ -549,7 +573,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final destinationUrl =
         'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-    // 🔲 Generate UPI QR as image
+    // 🔲 Generate UPI QR
     final qrValidationResult = QrValidator.validate(
       data: upiUrl,
       version: QrVersions.auto,
@@ -585,8 +609,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               pw.SizedBox(height: 24),
-
-              // Customer info
               pw.Text(
                 'Customer Name: $customer',
                 style: pw.TextStyle(font: font),
@@ -595,8 +617,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.Text('Address: $address', style: pw.TextStyle(font: font)),
               pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
               pw.SizedBox(height: 24),
-
-              // Items
               pw.Text(
                 'Items',
                 style: pw.TextStyle(
@@ -605,7 +625,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               pw.SizedBox(height: 8),
-
               pw.Table.fromTextArray(
                 headers: ['Item Type', 'Qty', 'Price (₹)'],
                 data: orderItems
@@ -629,7 +648,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   2: const pw.FlexColumnWidth(1.5),
                 },
               ),
-
               pw.SizedBox(height: 16),
               pw.Divider(),
               pw.Align(
@@ -644,8 +662,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               pw.SizedBox(height: 24),
-
-              // Payment section
               pw.Text(
                 'Scan to Pay via UPI:',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -653,7 +669,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.SizedBox(height: 8),
               pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
               pw.SizedBox(height: 8),
-
               pw.Center(
                 child: pw.UrlLink(
                   destination: destinationUrl,
@@ -678,7 +693,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 ),
               ),
-
               pw.SizedBox(height: 24),
               pw.Divider(),
               pw.Center(
@@ -697,10 +711,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
 
+    // 🔄 Save PDF locally
     final Uint8List bytes = await pdf.save();
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/laundry_bill.pdf');
     await file.writeAsBytes(bytes);
+
+    // ☁️ Upload to Supabase or your storage & get public URL
+    final pdfUrl = await uploadPdfAndGetPublicUrl(file); // implement this
 
     final billMessage =
         '''
@@ -717,78 +735,83 @@ To make payment, please scan the QR in the attached PDF.
 
 ⚠️ If your device does not support UPI deep links in PDFs, you can tap the link below to pay directly:
 
-👉 https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR
+👉 $destinationUrl
 
 Once payment is done, please reply with "Paid" for confirmation. ✅
 
 Thank you!
-— Ayening Kadai
+— Ayaning Kadai
 ''';
 
-    if (Platform.isAndroid) {
-      // Step 1: Share PDF first
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    await sendPdfToWhatsApp(phone, pdfUrl);
+    await sendTextMessageToWhatsApp(phone, billMessage);
+  }
 
-      // Step 2: Prompt user to send message via WhatsApp
-      final shouldSendText = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Send Message?"),
-          content: const Text(
-            "Do you want to send the payment instructions on WhatsApp too?",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text("No"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("Yes"),
-            ),
-          ],
-        ),
-      );
+  Future<void> sendPdfToWhatsApp(String phoneNumber, String pdfUrl) async {
+    final uri = Uri.parse(
+      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+    );
 
-      if (shouldSendText == true) {
-        final encodedText = Uri.encodeComponent(billMessage);
-        final whatsappUrl = Uri.parse('https://wa.me/?text=$encodedText');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "messaging_product": "whatsapp",
+        "to": phoneNumber,
+        "type": "document",
+        "document": {"link": pdfUrl, "filename": "laundry_bill.pdf"},
+      }),
+    );
 
-        if (await canLaunchUrl(whatsappUrl)) {
-          await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Could not open WhatsApp")),
-          );
-        }
-      }
-    } else if (Platform.isIOS || Platform.isMacOS) {
-      // ✅ Share PDF + Text together
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)], text: billMessage),
-      );
+    if (response.statusCode == 200) {
+      print('✅ PDF sent successfully to $phoneNumber');
     } else {
-      // Fallback for unsupported platforms
-      print("Sharing is not supported on this platform.");
+      print('❌ PDF send failed: ${response.body}');
     }
   }
 
-  bool validateRequiredFields({
-    required BuildContext context,
-    required List<String> fields,
-    required List<String> fieldNames,
-  }) {
-    for (int i = 0; i < fields.length; i++) {
-      if (fields[i].trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please enter ${fieldNames[i]}.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return false;
-      }
+  Future<void> sendTextMessageToWhatsApp(
+    String phoneNumber,
+    String message,
+  ) async {
+    final uri = Uri.parse(
+      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "messaging_product": "whatsapp",
+        "to": phoneNumber,
+        "type": "text",
+        "text": {"body": message},
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('✅ Text message sent successfully');
+    } else {
+      print('❌ Text send failed: ${response.body}');
     }
-    return true;
+  }
+
+  Future<String> uploadPdfAndGetPublicUrl(File file) async {
+    final storage = Supabase.instance.client.storage;
+    final bucket = storage.from('invoices');
+    final filePath = 'invoice_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+    final response = await bucket.upload(filePath, file);
+    if (response.isEmpty) {
+      throw Exception('File upload failed');
+    }
+    final publicUrl = bucket.getPublicUrl(filePath);
+    return publicUrl;
   }
 }
