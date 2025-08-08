@@ -19,7 +19,7 @@ import '../../services/supabase_service.dart';
 
 const phoneNumberId = '755009301035664';
 const accessToken =
-    'EAASgUfHkTxUBPPz5KdLY8LuaToHPH77oyDR9AaCl8Ud7ntileuygM8kaB5lPukM4H2Un7HyZBtw4ASo0BgLvktqnffnMLnhY0KnozYZC5In7ovggl8Y0OGT19EuaGYoEPZA8xxVMURFvU6dnQfvhTKqZAtJf3vqoOFxHzZBoVGvGo8qHbUxCZB7A3ZCfGZBXqd2P6gZDZD';
+    'EAAX120ZCV0iQBPFZBNZAtlU7PZBXQ6CrE12T5YugMYCjRrCuuZCs8fUd0RAZBUwivaIqwmiTIsg7N9Ai4k5lDEcGBLITZAYOGjXhB0dK651cZCMZB0tJgZARknuDQQJDnVrXZAkmkrVdBUhurxM2ibHbQhho59VLAiZAa9r9sOvDpFpbQjPojuiTsC0kkKH8fIJ2kVRfnwZDZD';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
