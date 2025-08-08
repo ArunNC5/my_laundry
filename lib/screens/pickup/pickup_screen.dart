@@ -107,7 +107,7 @@ class _PickupScreenState extends State<PickupScreen> {
 
       final orderId = await supabaseService.insertOrder(
         customerName: nameController.text.trim(),
-        customerPhone: phoneController.text.trim(),
+        customerPhone: "91${phoneController.text.trim()}",
         customerAddress: addressController.text.trim(),
         status: 'picked_up',
         pickupTime: DateTime.now(),
