@@ -12,10 +12,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// import 'package:shared_preferences/shared_preferences.dart'; // REMOVED
-
 import '../../models/order.dart';
 import '../../services/supabase_service.dart';
+import '../pickup/pickup_screen.dart'; // Ensure this path is correct
 
 const phoneNumberId = '755009301035664';
 const accessToken =
@@ -42,21 +41,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<Map<String, dynamic>> payments = [];
   bool isLoadingItems = true;
   bool _isLoading = false;
-
-  // bool _editUPI = false; // REMOVED: No longer needed
   bool isLoadingPayments = true;
   String? _upiUrl;
+
+  String _currentOrderStatus = '';
 
   @override
   void initState() {
     super.initState();
+    _currentOrderStatus = widget.order['status'] ?? 'pending';
     _loadOrderItems();
     _loadPayments();
-    _amountController.text = widget.order['total_price']?.toString() ?? '';
-    _loadUpiDetailsFromSupabase(); // New method to load UPI details
+    // Ensure the initial amount controller text is a valid number string
+    _amountController.text =
+    (widget.order['total_price'] is num) ? widget.order['total_price'].toString() :
+    (int.tryParse(widget.order['total_price']?.toString() ?? '0') ?? 0).toString();
+    _loadUpiDetailsFromSupabase();
   }
 
-  // New method to fetch UPI details from Supabase
   Future<void> _loadUpiDetailsFromSupabase() async {
     try {
       final upiData = await supabaseService.fetchUPIDetails();
@@ -65,7 +67,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _upiNameController.text = upiData?['upi_name'] ?? 'Satish V';
       });
     } catch (e) {
-      // Handle error, e.g., show a SnackBar or log it
       print('Error fetching UPI details: $e');
       ScaffoldMessenger.of(
         context,
@@ -77,7 +78,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final id = widget.order['id'].toString();
     final items = await supabaseService.fetchOrderItems(id);
     setState(() {
-      orderItems = items;
+      // Ensure item_price and quantity are parsed to numbers if they come as strings
+      orderItems = items.map((item) => {
+        'item_type': item['item_type'],
+        'quantity': int.tryParse(item['quantity']?.toString() ?? '0') ?? 0,
+        'item_price': int.tryParse(item['item_price']?.toString() ?? '0') ?? 0,
+        // Add other fields as necessary
+      }).toList();
       isLoadingItems = false;
     });
   }
@@ -91,15 +98,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
-  // REMOVED: _loadUPIPreferences() method is no longer needed
-
   void _generateQr() {
     final amount = _amountController.text.trim();
     final upiId = _upiIdController.text.trim();
     final upiName = _upiNameController.text.trim();
 
-    // The validation for these fields will now primarily check if Supabase returned them.
-    // If Supabase returns empty, the validation will still catch it.
     if (amount.isEmpty || upiId.isEmpty || upiName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -140,6 +143,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         method: 'upi',
       );
 
+      setState(() {
+        _currentOrderStatus = 'delivered';
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order marked as delivered')),
       );
@@ -154,21 +161,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildUPICard() {
-    // Simplified: Always display, no edit mode
     return Column(
-      // Removed Center widget wrapper
-      crossAxisAlignment: CrossAxisAlignment.start, // Changed back to start
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'UPI ID: ${_upiIdController.text.isNotEmpty ? _upiIdController.text : 'Loading...'}',
           style: const TextStyle(fontSize: 16),
-          // Removed textAlign: TextAlign.center
         ),
         const SizedBox(height: 4),
         Text(
           'Name: ${_upiNameController.text.isNotEmpty ? _upiNameController.text : 'Loading...'}',
           style: const TextStyle(fontSize: 16),
-          // Removed textAlign: TextAlign.center
         ),
       ],
     );
@@ -182,18 +185,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       customerName: order['customer_name'] ?? '',
       customerPhone: order['customer_phone'] ?? '',
       customerAddress: order['customer_address'] ?? '',
-      totalPrice: order['total_price'] ?? '',
-      status: order['status'] ?? '',
+      // Ensure totalPrice is a number (int or double)
+      totalPrice: (order['total_price'] is num)
+          ? order['total_price']
+          : int.tryParse(order['total_price']?.toString() ?? '0') ?? 0,
+      status: _currentOrderStatus,
       pickupTime:
-          DateTime.tryParse(order['pickup_time'] ?? '') ?? DateTime.now(),
+      DateTime.tryParse(order['pickup_time'] ?? '') ?? DateTime.now(),
       deliveryDueTime:
-          DateTime.tryParse(order['delivery_due_time'] ?? '') ??
+      DateTime.tryParse(order['delivery_due_time'] ?? '') ??
           DateTime.now().add(const Duration(days: 1)),
     );
 
     final createdAt =
         DateTime.tryParse(order['created_at'] ?? '') ?? DateTime.now();
     final isDelivered = orderObj.status.toLowerCase() == 'delivered';
+    final isPending = orderObj.status.toLowerCase() == 'pending';
+    final isPickedUpOrInProcess =
+        orderObj.status.toLowerCase() == 'picked_up' ||
+            orderObj.status.toLowerCase() == 'in_process';
+
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
     return Scaffold(
@@ -236,7 +247,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   _infoRow(
                     'Delivery Status',
-                    isDelivered ? 'Delivered ✅' : 'Pending ❌',
+                    isDelivered
+                        ? 'Delivered ✅'
+                        : '${orderObj.status.substring(0, 1).toUpperCase()}${orderObj.status.substring(1).replaceAll('_', ' ')} ❌',
                   ),
                   _infoRow('Total Price', orderObj.totalPrice.toString()),
                 ],
@@ -279,7 +292,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
 
-            if (!isDelivered) ...[
+            if (isPending) ...[
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -290,18 +303,72 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    // This aligns the Form to the start
+                    children: [
+                      const Text(
+                        'Order Action: Pending Pickup',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'This order is currently pending and awaiting pickup. Tap the button below to proceed with pickup.',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    PickupScreen(order: widget.order),
+                              ),
+                            );
+                            if (result is bool && result) {
+                              _loadOrderItems();
+                              _loadPayments();
+                              setState(() {
+                                _currentOrderStatus = 'picked_up';
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.delivery_dining),
+                          label: const Text('Initiate Pickup'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else if (isPickedUpOrInProcess) ...[
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Form(
                         key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          // <-- Add this line here to align the UPI details
                           children: [
                             const Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                'Payment Collection',
+                                'Payment Collection & Delivery',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -309,24 +376,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Text(
-                              'UPI ID: ${_upiIdController.text.isNotEmpty ? _upiIdController.text : 'Loading...'}',
-                              style: const TextStyle(fontSize: 16),
-                              // textAlign: TextAlign.start, // Optional: Can remove as crossAxisAlignment handles it
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Name: ${_upiNameController.text.isNotEmpty ? _upiNameController.text : 'Loading...'}',
-                              style: const TextStyle(fontSize: 16),
-                              // textAlign: TextAlign.start, // Optional: Can remove as crossAxisAlignment handles it
-                            ),
+                            _buildUPICard(),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _amountController,
                               keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                              const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
                               decoration: const InputDecoration(
                                 labelText: 'Enter payment amount (₹)',
                                 border: OutlineInputBorder(),
@@ -383,7 +440,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   );
 
                                   if (!isValid) return;
-                                  _generateQr(); // Corrected call
+                                  _generateQr();
                                 },
                                 icon: const Icon(Icons.qr_code),
                                 label: const Text('Generate UPI QR'),
@@ -400,21 +457,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               width: double.infinity,
                               child: _isLoading
                                   ? const Center(
-                                      child: CircularProgressIndicator(),
-                                    )
+                                child: CircularProgressIndicator(),
+                              )
                                   : ElevatedButton.icon(
-                                      icon: const Icon(Icons.done_all),
-                                      label: const Text('Mark as Delivered'),
-                                      onPressed: _markAsDelivered,
-                                      style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        textStyle: const TextStyle(
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
+                                icon: const Icon(Icons.done_all),
+                                label: const Text('Mark as Delivered'),
+                                onPressed: _markAsDelivered,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -560,7 +617,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     final customer = widget.order['customer_name'];
-    final phone = widget.order['customer_phone']; // Should be 91xxxxxxxxxx
+    final phone = widget.order['customer_phone'];
     final address = widget.order['customer_address'];
     final amount = _amountController.text;
     final date = DateFormat('dd MMM yyyy, hh:mm a').format(
@@ -573,7 +630,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final destinationUrl =
         'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-    // 🔲 Generate UPI QR
     final qrValidationResult = QrValidator.validate(
       data: upiUrl,
       version: QrVersions.auto,
@@ -589,7 +645,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final picData = await painter.toImageData(200);
     final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
 
-    // 🧾 Build PDF
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -630,11 +685,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 data: orderItems
                     .map(
                       (item) => [
-                        item['item_type'] ?? '',
-                        '${item['quantity']}',
-                        '${item['item_price'] ?? 0}',
-                      ],
-                    )
+                    item['item_type'] ?? '',
+                    '${item['quantity']}', // quantity is now guaranteed to be int
+                    '${item['item_price'] ?? 0}', // item_price is now guaranteed to be int
+                  ],
+                )
                     .toList(),
                 headerStyle: pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
@@ -697,7 +752,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.Divider(),
               pw.Center(
                 child: pw.Text(
-                  'Thank you for choosing Ayening Kadai!',
+                  'Thank you for choosing Ayaning Kadai!',
                   style: pw.TextStyle(
                     fontSize: 14,
                     fontStyle: pw.FontStyle.italic,
@@ -711,37 +766,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
 
-    // 🔄 Save PDF locally
     final Uint8List bytes = await pdf.save();
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/laundry_bill.pdf');
     await file.writeAsBytes(bytes);
 
-    // ☁️ Upload to Supabase or your storage & get public URL
-    final pdfUrl = await uploadPdfAndGetPublicUrl(file); // implement this
+    final pdfUrl = await uploadPdfAndGetPublicUrl(file);
 
-    final billMessage =
-        '''
-🧾 Your Laundry Bill
+    final billMessage = '''
+🧾 Laundry Bill
 
-Hello 👋,
-Thank you for choosing our laundry service!
+Hi 👋, thanks for choosing us!
 
-🧍 Customer Name: $customer
-💰 Amount Due: ₹$amount
-📅 Bill Date: $date
+ Name: $customer  
+ Amount: ₹$amount  
+ Date: $date  
 
-To make payment, please scan the QR in the attached PDF.
+Scan the QR in the attached PDF to pay.  
+Or pay directly here: $destinationUrl  
 
-⚠️ If your device does not support UPI deep links in PDFs, you can tap the link below to pay directly:
+Reply "Paid" after payment ✅  
 
-👉 $destinationUrl
-
-Once payment is done, please reply with "Paid" for confirmation. ✅
-
-Thank you!
 — Ayaning Kadai
 ''';
+
 
     await sendPdfToWhatsApp(phone, pdfUrl);
     await sendTextMessageToWhatsApp(phone, billMessage);
@@ -762,7 +810,7 @@ Thank you!
         "messaging_product": "whatsapp",
         "to": phoneNumber,
         "type": "document",
-        "document": {"link": pdfUrl, "filename": "laundry_bill.pdf"},
+        "document": {"link": pdfUrl, "filename": "invoice.pdf"},
       }),
     );
 
@@ -774,9 +822,9 @@ Thank you!
   }
 
   Future<void> sendTextMessageToWhatsApp(
-    String phoneNumber,
-    String message,
-  ) async {
+      String phoneNumber,
+      String message,
+      ) async {
     final uri = Uri.parse(
       'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
     );

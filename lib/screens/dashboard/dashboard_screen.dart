@@ -13,6 +13,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final SupabaseService supabaseService = SupabaseService();
 
   int totalOrders = 0;
+  int pendingOrders = 0;
   int pickedUpOrders = 0;
   int deliveredOrders = 0;
   double totalRevenue = 0;
@@ -28,25 +29,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> loadAnalytics() async {
     final orders = await supabaseService.fetchOrders();
-    final payments = <Map<String, dynamic>>[];
-    for (final order in orders) {
-      final orderPayments = await supabaseService.fetchPayments(order['id']);
-      payments.addAll(orderPayments);
-    }
+
+    // Run all payment fetches in parallel
+    final paymentFutures = orders.map((order) => supabaseService.fetchPayments(order['id'])).toList();
+    final paymentResults = await Future.wait(paymentFutures);
+
+    // Flatten the list of lists into a single list
+    final payments = paymentResults.expand((pList) => pList).toList();
+
     final services = await supabaseService.fetchAllServices();
 
     setState(() {
       totalOrders = orders.length;
+      pendingOrders = orders.where((o) => o['status'] == 'pending').length;
       pickedUpOrders = orders.where((o) => o['status'] == 'picked_up').length;
       deliveredOrders = orders.where((o) => o['status'] == 'delivered').length;
       totalRevenue = payments.fold(
         0.0,
-        (sum, p) => sum + (p['amount'] as num).toDouble(),
+            (sum, p) => sum + (p['amount'] as num).toDouble(),
       );
       totalServices = services.length;
       loading = false;
     });
   }
+
 
   Widget buildCard(String title, String value, IconData icon, Color color) {
     return Card(
@@ -103,6 +109,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Colors.blue,
                   ),
                   buildCard(
+                    'Pending Orders',
+                    '$pendingOrders',
+                    Icons.pending,
+                    Colors.red,
+                  ),buildCard(
                     'Picked Up Orders',
                     '$pickedUpOrders',
                     Icons.local_shipping,

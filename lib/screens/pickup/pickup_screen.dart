@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Added for input formatters
 
 import '../../services/supabase_service.dart';
+import '../home/home_screen.dart';
 
 class PickupScreen extends StatefulWidget {
-  const PickupScreen({super.key});
+  final Map<String, dynamic>? order; // Make order nullable for new pickups
+
+  const PickupScreen({super.key, this.order}); // Accept optional order
 
   @override
   State<PickupScreen> createState() => _PickupScreenState();
@@ -16,7 +19,8 @@ class _PickupScreenState extends State<PickupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  final TextEditingController customItemController = TextEditingController();
+
+  // Removed customItemController as it was unused and replaced by dialog logic
 
   final FocusNode nameFocus = FocusNode();
   final FocusNode phoneFocus = FocusNode();
@@ -27,11 +31,81 @@ class _PickupScreenState extends State<PickupScreen> {
 
   List<Map<String, dynamic>> itemTypes = [];
 
+  List<Map<String, dynamic>> get ironingItems =>
+      itemTypes.where((item) => item['category'] == 'Ironing').toList();
+
   List<Map<String, dynamic>> get washingItems =>
       itemTypes.where((item) => item['category'] == 'Washing').toList();
 
-  List<Map<String, dynamic>> get ironingItems =>
-      itemTypes.where((item) => item['category'] == 'Ironing').toList();
+  @override
+  void initState() {
+    super.initState();
+    _initializeFields(); // NEW: Method to handle prefilling existing orders
+    phoneController.addListener(_onPhoneChanged);
+    loadServices();
+  }
+
+  // NEW: Method to pre-fill fields if an existing order is passed
+  void _initializeFields() async {
+    if (widget.order != null) {
+      // Pre-fill fields for existing order
+      nameController.text = widget.order!['customer_name'] ?? '';
+      // Assuming phone number comes as '91XXXXXXXXXX', extract last 10 digits
+      String? fullPhoneNumber = widget.order!['customer_phone'];
+      if (fullPhoneNumber != null &&
+          fullPhoneNumber.startsWith('91') &&
+          fullPhoneNumber.length == 12) {
+        phoneController.text = fullPhoneNumber.substring(2);
+      } else {
+        phoneController.text =
+            fullPhoneNumber ?? ''; // Fallback for other formats/null
+      }
+      addressController.text = widget.order!['customer_address'] ?? '';
+
+      // Load existing order items into the 'clothes' list
+      await _loadOrderItemsForExistingOrder(widget.order!['id'].toString());
+    }
+  }
+
+  // NEW: Method to fetch and load items for an existing order
+  Future<void> _loadOrderItemsForExistingOrder(String orderId) async {
+    try {
+      final items = await supabaseService.fetchOrderItems(orderId);
+      setState(() {
+        clothes = items
+            .map(
+              (item) => {
+                'name': item['item_type'],
+                'category': item['category'] ?? 'Custom',
+                // Ensure category is available
+                'price':
+                    int.tryParse(item['item_price']?.toString() ?? '0') ?? 0,
+                // Ensure price is int
+                'quantity':
+                    int.tryParse(item['quantity']?.toString() ?? '0') ?? 0,
+                // Ensure quantity is int
+              },
+            )
+            .toList();
+      });
+    } catch (e) {
+      print('Error loading existing order items: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading existing items: $e')),
+      );
+    }
+  }
+
+  // Listener for phone number changes to trigger customer prefill
+  void _onPhoneChanged() {
+    // Only trigger prefill if phone number has exactly 10 digits
+    // And if the name/address fields are currently empty (to avoid overwriting user input)
+    if (phoneController.text.length == 10 &&
+        nameController.text.isEmpty &&
+        addressController.text.isEmpty) {
+      fetchAndPrefillCustomer(phoneController.text);
+    }
+  }
 
   void addClothingItem(Map<String, dynamic> item) {
     setState(() {
@@ -39,13 +113,16 @@ class _PickupScreenState extends State<PickupScreen> {
         (c) => c['name'] == item['name'] && c['category'] == item['category'],
       );
 
+      // Ensure item['price'] is an int before adding
+      final int itemPrice = int.tryParse(item['price']?.toString() ?? '0') ?? 0;
+
       if (index != -1) {
         clothes[index]['quantity']++;
       } else {
         clothes.add({
           'name': item['name'],
           'category': item['category'],
-          'price': item['price'],
+          'price': itemPrice,
           'quantity': 1,
         });
       }
@@ -53,15 +130,20 @@ class _PickupScreenState extends State<PickupScreen> {
   }
 
   Future<void> fetchAndPrefillCustomer(String phone) async {
-    if (phone.length < 10) return;
+    // This function is only called when phone.length == 10 by _onPhoneChanged
     final existingCustomer = await supabaseService.fetchLatestCustomerByPhone(
-      phone,
+      "91$phone", // Pass with country code for Supabase query
     );
     print('Fetched customer: $existingCustomer');
 
     if (existingCustomer != null) {
-      nameController.text = existingCustomer['customer_name'] ?? '';
-      addressController.text = existingCustomer['customer_address'] ?? '';
+      // Only prefill if the fields are currently empty to avoid overwriting user input
+      if (nameController.text.isEmpty) {
+        nameController.text = existingCustomer['customer_name'] ?? '';
+      }
+      if (addressController.text.isEmpty) {
+        addressController.text = existingCustomer['customer_address'] ?? '';
+      }
     }
   }
 
@@ -81,7 +163,9 @@ class _PickupScreenState extends State<PickupScreen> {
           const SnackBar(content: Text('Please enter phone number')),
         );
       } else if (addressController.text.trim().isEmpty) {
-        FocusScope.of(context).requestFocus(addressFocus);
+        FocusScope.of(
+          context,
+        ).requestFocus(addressFocus); // Ensure focus is set
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Please enter address')));
@@ -99,41 +183,100 @@ class _PickupScreenState extends State<PickupScreen> {
     setState(() => isSubmitting = true);
 
     try {
-      double totalPrice = 0;
+      double calculatedTotalPrice = 0;
       for (var item in clothes) {
-        final itemPrice = item['price'] ?? 0;
-        totalPrice += itemPrice * item['quantity'];
+        // Ensure price is treated as a number for calculation
+        final itemPrice = (item['price'] is num)
+            ? (item['price'] as num).toDouble()
+            : (double.tryParse(item['price']?.toString() ?? '0') ?? 0.0);
+        final itemQuantity = (item['quantity'] is num)
+            ? (item['quantity'] as num).toInt()
+            : (int.tryParse(item['quantity']?.toString() ?? '0') ?? 0);
+        calculatedTotalPrice += itemPrice * itemQuantity;
       }
 
-      final orderId = await supabaseService.insertOrder(
-        customerName: nameController.text.trim(),
-        customerPhone: "91${phoneController.text.trim()}",
-        customerAddress: addressController.text.trim(),
-        status: 'picked_up',
-        pickupTime: DateTime.now(),
-        deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
-        totalPrice: totalPrice.toInt(),
-      );
+      String orderId;
 
-      for (var item in clothes) {
-        await supabaseService.insertOrderItem(
+      if (widget.order != null) {
+        // This is an existing order being picked up/updated
+        orderId = widget.order!['id'];
+
+        // Update the existing order's details and status
+        await supabaseService.updateOrder(
           orderId: orderId,
-          itemType: item['name'],
-          quantity: item['quantity'],
-          itemPrice: item['price'],
+          customerName: nameController.text.trim(),
+          customerPhone: "91${phoneController.text.trim()}",
+          customerAddress: addressController.text.trim(),
+          status: 'picked_up',
+          // Set status to 'picked_up'
+          totalPrice: calculatedTotalPrice.toInt(),
+          // Update total price based on current items
+          pickupTime: DateTime.now(),
+          deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
+        );
+
+        // Delete existing items for this order before re-inserting
+        await supabaseService.deleteOrderItems(orderId);
+
+        // Insert the current list of items for this order
+        for (var item in clothes) {
+          await supabaseService.insertOrderItem(
+            orderId: orderId,
+            itemType: item['name'],
+            quantity: item['quantity'],
+            itemPrice: item['price'],
+          );
+        }
+
+        // Add a status update entry
+        await supabaseService.insertStatusUpdate(
+          orderId: orderId,
+          newStatus: 'picked_up',
+          updatedBy: 'agent',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order pickup confirmed and updated!')),
+        );
+      } else {
+        // This is a brand new pickup order
+        orderId = await supabaseService.insertOrder(
+          customerName: nameController.text.trim(),
+          customerPhone: "91${phoneController.text.trim()}",
+          customerAddress: addressController.text.trim(),
+          status: 'picked_up',
+          // New orders start as 'picked_up'
+          pickupTime: DateTime.now(),
+          deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
+          totalPrice: calculatedTotalPrice.toInt(),
+        );
+
+        for (var item in clothes) {
+          await supabaseService.insertOrderItem(
+            orderId: orderId,
+            itemType: item['name'],
+            quantity: item['quantity'],
+            itemPrice: item['price'],
+          );
+        }
+
+        await supabaseService.insertStatusUpdate(
+          orderId: orderId,
+          newStatus: 'picked_up',
+          updatedBy: 'agent',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('New pickup successfully created!')),
         );
       }
+      // Always pop with true to signal a potential change to the parent screen
+      // Navigator.pop(context, true);
 
-      await supabaseService.insertStatusUpdate(
-        orderId: orderId,
-        newStatus: 'picked_up',
-        updatedBy: 'agent',
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+        (Route<dynamic> route) => false,
       );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pickup successfully created!')),
-      );
-      Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -152,7 +295,7 @@ class _PickupScreenState extends State<PickupScreen> {
   void showCustomItemDialog() {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController priceController = TextEditingController();
-    String selectedCategory = 'Custom';
+    String selectedCategory = 'Custom'; // Default for custom items
 
     showDialog(
       context: context,
@@ -180,19 +323,19 @@ class _PickupScreenState extends State<PickupScreen> {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               value: selectedCategory,
-              items: ['Custom', 'Washing', 'Ironing']
-                  .map(
-                    (cat) => DropdownMenuItem(
-                      value: cat, // <-- DON'T lowercase here
-                      child: Text(cat),
-                    ),
-                  )
-                  .toList(),
+              items:
+                  [
+                        'Custom',
+                        'Washing',
+                        'Ironing',
+                      ] // Include 'Custom' as an option
+                      .map(
+                        (cat) => DropdownMenuItem(value: cat, child: Text(cat)),
+                      )
+                      .toList(),
               onChanged: (value) {
                 if (value != null) {
-                  setState(() {
-                    selectedCategory = value;
-                  });
+                  selectedCategory = value; // Update the local variable
                 }
               },
               decoration: const InputDecoration(labelText: "Category"),
@@ -209,7 +352,7 @@ class _PickupScreenState extends State<PickupScreen> {
                 addClothingItem({
                   'name': name,
                   'category': selectedCategory,
-                  'price': price.toInt(),
+                  'price': price.toInt(), // Ensure price is int
                 });
               }
               Navigator.pop(context);
@@ -222,20 +365,32 @@ class _PickupScreenState extends State<PickupScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    phoneController.addListener(() {
-      if (phoneController.text.length == 10) {
-        fetchAndPrefillCustomer(phoneController.text);
-      }
-    });
-    loadServices();
+  void dispose() {
+    nameController.dispose();
+    phoneController.removeListener(_onPhoneChanged); // Remove listener
+    phoneController.dispose();
+    addressController.dispose();
+    nameFocus.dispose();
+    phoneFocus.dispose();
+    addressFocus.dispose();
+    super.dispose();
   }
 
   Future<void> loadServices() async {
     final fetched = await supabaseService.fetchAllServices();
     setState(() {
-      itemTypes = fetched;
+      // Ensure prices are parsed to int when loading services
+      itemTypes = fetched
+          .map(
+            (item) => {
+              'id': item['id'],
+              'name': item['name'],
+              'category': item['category'],
+              'price': int.tryParse(item['price']?.toString() ?? '0') ?? 0,
+              'icon_name': item['icon_name'],
+            },
+          )
+          .toList();
     });
   }
 
@@ -257,12 +412,19 @@ class _PickupScreenState extends State<PickupScreen> {
         crossAxisCount: 3,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.75, // Adjusted for more vertical room
+        childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
+        // Ensure item has 'name', 'category', 'price' keys from your Supabase fetch
+        final String itemName = item['name'] ?? 'Unknown Item';
+        final String itemCategory = item['category'] ?? 'Uncategorized';
+        // Ensure itemPrice is int
+        final int itemPrice =
+            int.tryParse(item['price']?.toString() ?? '0') ?? 0;
+
         final existing = clothes.firstWhere(
-          (c) => c['name'] == item['name'] && c['category'] == item['category'],
+          (c) => c['name'] == itemName && c['category'] == itemCategory,
           orElse: () => {},
         );
         final isSelected = existing.isNotEmpty;
@@ -270,28 +432,23 @@ class _PickupScreenState extends State<PickupScreen> {
 
         return InkWell(
           onTap: () {
-            if (item['name'] == 'Custom') {
-              showCustomItemDialog();
-            } else {
-              setState(() {
-                final existingItemIndex = clothes.indexWhere(
-                  (c) =>
-                      c['name'] == item['name'] &&
-                      c['category'] == item['category'],
-                );
+            // This grid is for predefined items, custom items have a dedicated button
+            setState(() {
+              final existingItemIndex = clothes.indexWhere(
+                (c) => c['name'] == itemName && c['category'] == itemCategory,
+              );
 
-                if (existingItemIndex != -1) {
-                  clothes[existingItemIndex]['quantity']++;
-                } else {
-                  clothes.add({
-                    'name': item['name'],
-                    'quantity': 1,
-                    'category': item['category'],
-                    'price': item['price'],
-                  });
-                }
-              });
-            }
+              if (existingItemIndex != -1) {
+                clothes[existingItemIndex]['quantity']++;
+              } else {
+                clothes.add({
+                  'name': itemName,
+                  'quantity': 1,
+                  'category': itemCategory,
+                  'price': itemPrice, // Use the parsed int price
+                });
+              }
+            });
           },
           child: Container(
             padding: const EdgeInsets.all(10),
@@ -312,6 +469,7 @@ class _PickupScreenState extends State<PickupScreen> {
               children: [
                 Image.asset(
                   'assets/icons/${item['icon_name']}',
+                  // Make sure 'icon_name' exists for all services
                   width: 50,
                   height: 50,
                   color: const Color(0xFF6A11CB),
@@ -325,7 +483,7 @@ class _PickupScreenState extends State<PickupScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  item['name'],
+                  itemName,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -351,14 +509,16 @@ class _PickupScreenState extends State<PickupScreen> {
                             setState(() {
                               final idx = clothes.indexWhere(
                                 (c) =>
-                                    c['name'] == item['name'] &&
-                                    c['category'] == item['category'],
+                                    c['name'] == itemName &&
+                                    c['category'] == itemCategory,
                               );
                               if (idx != -1) {
                                 if (clothes[idx]['quantity'] > 1) {
                                   clothes[idx]['quantity']--;
                                 } else {
-                                  clothes.removeAt(idx);
+                                  clothes.removeAt(
+                                    idx,
+                                  ); // Remove if quantity is 1
                                 }
                               }
                             });
@@ -379,8 +539,8 @@ class _PickupScreenState extends State<PickupScreen> {
                             setState(() {
                               final idx = clothes.indexWhere(
                                 (c) =>
-                                    c['name'] == item['name'] &&
-                                    c['category'] == item['category'],
+                                    c['name'] == itemName &&
+                                    c['category'] == itemCategory,
                               );
                               if (idx != -1) {
                                 clothes[idx]['quantity']++;
@@ -404,7 +564,11 @@ class _PickupScreenState extends State<PickupScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
-        title: const Text('New Pickup', style: TextStyle(color: Colors.white)),
+        title: Text(
+          widget.order != null ? 'Edit Pickup Order' : 'New Pickup Order',
+          // Dynamic title
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -438,10 +602,16 @@ class _PickupScreenState extends State<PickupScreen> {
                 focusNode: phoneFocus,
                 decoration: inputDecoration('Phone Number'),
                 keyboardType: TextInputType.phone,
+                maxLength: 10,
+                // Max length for user input
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 validator: (v) {
                   final phone = v?.trim() ?? '';
                   if (phone.isEmpty) return 'Enter phone number';
-                  if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+                  if (phone.length != 10) {
                     return 'Enter a valid 10-digit number';
                   }
                   return null;
@@ -458,19 +628,20 @@ class _PickupScreenState extends State<PickupScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Washing Services',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              buildItemGrid(washingItems),
-              const SizedBox(height: 20),
-              const Text(
                 'Ironing Services',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               buildItemGrid(ironingItems),
               const SizedBox(height: 10),
+              const Text(
+                'Washing Services',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              buildItemGrid(washingItems),
+              const SizedBox(height: 20),
+
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Center(
@@ -501,44 +672,62 @@ class _PickupScreenState extends State<PickupScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Selected Items",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...clothes.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    title: Text(item['name'] ?? ''),
-                    trailing: FittedBox(
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: () {
-                              setState(() {
-                                if (item['quantity'] > 1) item['quantity']--;
-                              });
-                            },
-                          ),
-                          Text(item['quantity'].toString()),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () {
-                              setState(() => item['quantity']++);
-                            },
-                          ),
-                        ],
+              // Only show selected items section if there are items
+              if (clothes.isNotEmpty) ...[
+                const Text(
+                  "Selected Items",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...clothes.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      title: Text(item['name'] ?? ''),
+                      subtitle: Text(
+                        'Category: ${item['category'] ?? 'N/A'} - Price: ₹${item['price'] ?? 0}',
                       ),
+                      trailing: FittedBox(
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline),
+                              onPressed: () {
+                                setState(() {
+                                  if (item['quantity'] > 1) {
+                                    item['quantity']--;
+                                  } else {
+                                    clothes.removeAt(
+                                      index,
+                                    ); // Remove if quantity is 1
+                                  }
+                                });
+                              },
+                            ),
+                            Text(item['quantity'].toString()),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: () {
+                                setState(() => item['quantity']++);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      onLongPress: () {
+                        // Option to remove item completely with a long press
+                        setState(() => clothes.removeAt(index));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${item['name']} removed.')),
+                        );
+                      },
                     ),
-                    onLongPress: () => setState(() => clothes.removeAt(index)),
-                  ),
-                );
-              }),
-              const SizedBox(height: 30),
+                  );
+                }),
+                const SizedBox(height: 30),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -553,7 +742,11 @@ class _PickupScreenState extends State<PickupScreen> {
                         )
                       : const Icon(Icons.done),
                   label: Text(
-                    isSubmitting ? 'Submitting...' : 'Submit & Pickup',
+                    isSubmitting
+                        ? 'Submitting...'
+                        : widget.order != null
+                        ? 'Confirm Pickup & Update'
+                        : 'Submit & Pickup', // Dynamic button text
                     style: const TextStyle(fontSize: 16),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -562,6 +755,7 @@ class _PickupScreenState extends State<PickupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     backgroundColor: const Color(0xFF6A11CB),
+                    foregroundColor: Colors.white,
                   ),
                   onPressed: isSubmitting ? null : submitPickup,
                 ),
