@@ -717,13 +717,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               pw.SizedBox(height: 24),
-              pw.Text(
-                'Scan to Pay via UPI:',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Center(child: pw.Image(qrImage, width: 150, height: 150)),
-              pw.SizedBox(height: 8),
               pw.Center(
                 child: pw.UrlLink(
                   destination: destinationUrl,
@@ -734,17 +727,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       color: PdfColors.blue,
                       font: font,
                     ),
-                  ),
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Center(
-                child: pw.Text(
-                  '(If the link doesn’t open, scan the QR code)',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontStyle: pw.FontStyle.italic,
-                    font: font,
                   ),
                 ),
               ),
@@ -781,15 +763,9 @@ Hi 👋, thanks for choosing us!
  Name: $customer  
  Amount: ₹$amount  
  Date: $date  
-
-Scan the QR in the attached PDF to pay.  
-Or pay directly here: $destinationUrl  
-
-Reply "Paid" after payment ✅  
-
+ 
 — Ayaning Kadai
 ''';
-
 
     await sendPdfToWhatsApp(phone, pdfUrl);
     await sendTextMessageToWhatsApp(phone, billMessage);
