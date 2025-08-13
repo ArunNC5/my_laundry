@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for input formatters
+import 'package:http/http.dart' as http;
 
 import '../../services/supabase_service.dart';
 import '../home/home_screen.dart';
+import '../home/order_detail.dart';
 
 class PickupScreen extends StatefulWidget {
   final Map<String, dynamic>? order; // Make order nullable for new pickups
@@ -163,12 +167,10 @@ class _PickupScreenState extends State<PickupScreen> {
           const SnackBar(content: Text('Please enter phone number')),
         );
       } else if (addressController.text.trim().isEmpty) {
-        FocusScope.of(
-          context,
-        ).requestFocus(addressFocus); // Ensure focus is set
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Please enter address')));
+        FocusScope.of(context).requestFocus(addressFocus);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter address')),
+        );
       }
       return;
     }
@@ -183,9 +185,9 @@ class _PickupScreenState extends State<PickupScreen> {
     setState(() => isSubmitting = true);
 
     try {
+      // Calculate total price
       double calculatedTotalPrice = 0;
       for (var item in clothes) {
-        // Ensure price is treated as a number for calculation
         final itemPrice = (item['price'] is num)
             ? (item['price'] as num).toDouble()
             : (double.tryParse(item['price']?.toString() ?? '0') ?? 0.0);
@@ -198,27 +200,22 @@ class _PickupScreenState extends State<PickupScreen> {
       String orderId;
 
       if (widget.order != null) {
-        // This is an existing order being picked up/updated
+        // Update existing order
         orderId = widget.order!['id'];
 
-        // Update the existing order's details and status
         await supabaseService.updateOrder(
           orderId: orderId,
           customerName: nameController.text.trim(),
           customerPhone: "91${phoneController.text.trim()}",
           customerAddress: addressController.text.trim(),
           status: 'picked_up',
-          // Set status to 'picked_up'
           totalPrice: calculatedTotalPrice.toInt(),
-          // Update total price based on current items
           pickupTime: DateTime.now(),
           deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
         );
 
-        // Delete existing items for this order before re-inserting
         await supabaseService.deleteOrderItems(orderId);
 
-        // Insert the current list of items for this order
         for (var item in clothes) {
           await supabaseService.insertOrderItem(
             orderId: orderId,
@@ -228,24 +225,18 @@ class _PickupScreenState extends State<PickupScreen> {
           );
         }
 
-        // Add a status update entry
         await supabaseService.insertStatusUpdate(
           orderId: orderId,
           newStatus: 'picked_up',
           updatedBy: 'agent',
         );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order pickup confirmed and updated!')),
-        );
       } else {
-        // This is a brand new pickup order
+        // Insert new order
         orderId = await supabaseService.insertOrder(
           customerName: nameController.text.trim(),
           customerPhone: "91${phoneController.text.trim()}",
           customerAddress: addressController.text.trim(),
           status: 'picked_up',
-          // New orders start as 'picked_up'
           pickupTime: DateTime.now(),
           deliveryDueTime: DateTime.now().add(const Duration(hours: 36)),
           totalPrice: calculatedTotalPrice.toInt(),
@@ -265,24 +256,81 @@ class _PickupScreenState extends State<PickupScreen> {
           newStatus: 'picked_up',
           updatedBy: 'agent',
         );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('New pickup successfully created!')),
-        );
       }
-      // Always pop with true to signal a potential change to the parent screen
-      // Navigator.pop(context, true);
 
+      // ✅ WhatsApp message sending (shared for both flows)
+      StringBuffer itemListBuffer = StringBuffer();
+      for (var item in clothes) {
+        itemListBuffer.writeln("• ${item['name']} × ${item['quantity']}");
+      }
+
+      String message = """
+🧺 *Laundry Pickup Confirmed!*
+
+Hello ${nameController.text.trim()},
+We have picked up your laundry items:
+
+${itemListBuffer.toString().trim()}
+
+📅 Estimated delivery: within 36 hours.
+
+Thank you for choosing our service!
+""";
+
+      await sendTextMessageToWhatsApp(
+        "91${phoneController.text.trim()}",
+        message,
+      );
+
+      // Success message (depends on flow)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.order != null
+              ? 'Order pickup confirmed and updated!'
+              : 'New pickup successfully created!'),
+        ),
+      );
+
+      // Navigate to Home
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => HomeScreen()),
-        (Route<dynamic> route) => false,
+            (Route<dynamic> route) => false,
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
       setState(() => isSubmitting = false);
+    }
+  }
+
+  Future<void> sendTextMessageToWhatsApp(
+    String phoneNumber,
+    String message,
+  ) async {
+    final uri = Uri.parse(
+      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "messaging_product": "whatsapp",
+        "to": phoneNumber,
+        "type": "text",
+        "text": {"body": message},
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('✅ Text message sent successfully');
+    } else {
+      print('❌ Text send failed: ${response.body}');
     }
   }
 
