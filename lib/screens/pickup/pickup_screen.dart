@@ -168,9 +168,9 @@ class _PickupScreenState extends State<PickupScreen> {
         );
       } else if (addressController.text.trim().isEmpty) {
         FocusScope.of(context).requestFocus(addressFocus);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter address')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please enter address')));
       }
       return;
     }
@@ -264,7 +264,8 @@ class _PickupScreenState extends State<PickupScreen> {
         itemListBuffer.writeln("• ${item['name']} × ${item['quantity']}");
       }
 
-      String message = """
+      String message =
+          """
 🧺 *Laundry Pickup Confirmed!*
 
 Hello ${nameController.text.trim()},
@@ -285,21 +286,23 @@ Thank you for choosing our service!
       // Success message (depends on flow)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.order != null
-              ? 'Order pickup confirmed and updated!'
-              : 'New pickup successfully created!'),
+          content: Text(
+            widget.order != null
+                ? 'Order pickup confirmed and updated!'
+                : 'New pickup successfully created!',
+          ),
         ),
       );
 
       // Navigate to Home
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => HomeScreen()),
-            (Route<dynamic> route) => false,
+        (Route<dynamic> route) => false,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       setState(() => isSubmitting = false);
     }
@@ -425,21 +428,65 @@ Thank you for choosing our service!
   }
 
   Future<void> loadServices() async {
-    final fetched = await supabaseService.fetchAllServices();
-    setState(() {
-      // Ensure prices are parsed to int when loading services
-      itemTypes = fetched
-          .map(
-            (item) => {
-              'id': item['id'],
-              'name': item['name'],
-              'category': item['category'],
-              'price': int.tryParse(item['price']?.toString() ?? '0') ?? 0,
-              'icon_name': item['icon_name'],
-            },
-          )
-          .toList();
-    });
+    try {
+      print('DEBUG: Attempting to load services from Supabase...');
+      // This is the critical call. We need to see what it returns.
+      final fetched = await supabaseService.fetchAllServices();
+      print('DEBUG: Raw data fetched from Supabase for services: $fetched');
+
+      if (fetched.isEmpty) {
+        print(
+          'DEBUG: No services found or fetch returned empty/null data. Check Supabase table and RLS.',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No laundry services found. Please configure in Supabase.',
+              ),
+            ),
+          );
+        }
+        setState(() {
+          itemTypes = []; // Ensure itemTypes is explicitly empty
+        });
+        return; // Exit if no data
+      }
+
+      setState(() {
+        itemTypes = fetched.map<Map<String, dynamic>>((item) {
+          // Add null checks and default values for robustness
+          return {
+            'id': item['id'],
+            'name': item['name'] as String? ?? 'Unknown Item',
+            // Provide default if null
+            'category': item['category'] as String? ?? 'Custom',
+            // Provide default if null
+            'price': int.tryParse(item['price']?.toString() ?? '0') ?? 0,
+            'icon_name': item['icon_name'] != null
+                ? '${item['icon_name']}.png'
+                : 'default_icon.png',
+            // Provide default
+          };
+        }).toList();
+        print('DEBUG: Processed itemTypes after mapping: $itemTypes');
+      });
+      print(
+        'DEBUG: Services loaded successfully. Item count: ${itemTypes.length}',
+      );
+    } catch (e) {
+      // This block will catch any errors thrown during the Supabase call or data processing
+      print('ERROR: Failed to load services: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading services: $e')));
+      }
+      setState(() {
+        itemTypes =
+            []; // Ensure state is reset on error to prevent infinite loader
+      });
+    }
   }
 
   Widget buildItemGrid(List<Map<String, dynamic>> items) {
