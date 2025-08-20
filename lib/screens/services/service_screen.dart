@@ -215,10 +215,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           icon: const Icon(Icons.edit),
                           onPressed: () => populateForm(service),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => handleDelete(service['id']),
-                        ),
+                        // IconButton(
+                        //   icon: const Icon(Icons.delete, color: Colors.red),
+                        //   onPressed: () => handleDelete(service['id']),
+                        // ),
                       ],
                     ),
                   ),
