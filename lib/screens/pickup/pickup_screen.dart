@@ -507,7 +507,7 @@ Thank you for choosing our service!
         crossAxisCount: 3,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.75,
+        childAspectRatio: 0.7,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
@@ -577,14 +577,14 @@ Thank you for choosing our service!
                   },
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  itemName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                Flexible(
+                  child: Text(
+                    itemName,
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                    maxLines: null, // unlimited lines
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
                 if (isSelected)

@@ -153,7 +153,7 @@ class OrderCard extends StatelessWidget {
                       Text(
                         overdue
                             ? 'Overdue since: ${formatDate(dueTime)}'
-                            : 'Due by: ${formatDate(dueTime)}',
+                            : 'Delivery by: ${formatDate(dueTime)}',
                         style: TextStyle(
                           fontSize: 15,
                           color: overdue ? Colors.red : Colors.black87,
