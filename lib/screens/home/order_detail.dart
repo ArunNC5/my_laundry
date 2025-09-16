@@ -869,7 +869,6 @@ Date: $date
         'message': pdfUrl,
         'direction': 'outbound',
         'raw_payload': {'filename': 'invoice.pdf', 'link': pdfUrl},
-        'created_at': DateTime.now().toIso8601String(),
       };
       await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
@@ -905,7 +904,6 @@ Date: $date
         'msg_type': 'text',
         'message': message,
         'direction': 'outbound',
-        'created_at': DateTime.now().toIso8601String(),
       };
       await Supabase.instance.client.from('messages').insert(newMsg);
     } else {

@@ -91,7 +91,6 @@ class _ChatScreenState extends State<ChatScreen> {
         'message': text,
         'direction': 'outbound',
         'is_read': true,
-        'created_at': DateTime.now().toIso8601String(),
       };
       await supabase.from('messages').insert(newMsg);
     } catch (e) {

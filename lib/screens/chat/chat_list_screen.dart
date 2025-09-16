@@ -23,7 +23,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _subscribeToRealtime();
   }
 
-  // Load chats and unread counts from DB
+  // Load initial chats and unread counts
   Future<void> _loadChats() async {
     final response = await supabase
         .from('messages')
@@ -38,7 +38,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     for (final msg in data) {
       final phone = msg['customer_phone'] as String;
 
-      // Keep latest message per phone
+      // Keep only the latest message per phone
       if (!latestByPhone.containsKey(phone)) {
         latestByPhone[phone] = msg;
       }
@@ -69,7 +69,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       callback: (payload) => _handleRealtime(payload.newRecord),
     );
 
-    // Update event
+    // Update event (read status changes)
     _channel.onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
@@ -84,18 +84,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _handleRealtime(Map<String, dynamic>? newMsg) {
     if (newMsg == null) return;
 
+    final phone = newMsg['customer_phone'] as String;
+
     setState(() {
-      // Update chat list
-      chats.removeWhere(
-              (chat) => chat['customer_phone'] == newMsg['customer_phone']);
+      // Remove old chat entry
+      chats.removeWhere((chat) => chat['customer_phone'] == phone);
+
+      // Insert new/updated chat at top
       chats.insert(0, newMsg);
 
-      // Update unread count
+      // Keep sorted by latest message
+      chats.sort((a, b) =>
+          (b['created_at'] as String).compareTo(a['created_at'] as String));
+
+      // Update unread badge
       if (newMsg['direction'] == 'inbound' && newMsg['is_read'] == false) {
-        _unreadCount[newMsg['customer_phone']] =
-            (_unreadCount[newMsg['customer_phone']] ?? 0) + 1;
+        _unreadCount[phone] = (_unreadCount[phone] ?? 0) + 1;
       } else if (newMsg['is_read'] == true) {
-        _unreadCount[newMsg['customer_phone']] = 0;
+        _unreadCount[phone] = 0; // reset badge in real-time
       }
     });
   }
@@ -108,14 +114,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   // Open chat and mark messages as read
   void _openChat(String phone) async {
-    // Mark all inbound messages as read
+    // Mark all inbound messages as read in Supabase
     await supabase
         .from('messages')
         .update({'is_read': true})
         .eq('customer_phone', phone)
         .eq('direction', 'inbound');
 
-    // Optimistically reset unread count locally
+    // Reset badge locally
     setState(() {
       _unreadCount[phone] = 0;
     });

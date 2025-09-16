@@ -347,7 +347,6 @@ Thank you for choosing our service!
         'msg_type': 'text',
         'message': message,
         'direction': 'outbound',
-        'created_at': DateTime.now().toIso8601String(),
       };
       await Supabase.instance.client.from('messages').insert(newMsg);
       print('✅ Text message sent successfully');

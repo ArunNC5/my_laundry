@@ -7,7 +7,7 @@ import 'package:my_laundry/screens/services/service_screen.dart';
 class MainNavigationScreen extends StatefulWidget {
   final int initialIndex; // Optional parameter
 
-  const MainNavigationScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+  const MainNavigationScreen({Key? key, this.initialIndex = 1}) : super(key: key);
 
   @override
   _MainNavigationScreenState createState() => _MainNavigationScreenState();
