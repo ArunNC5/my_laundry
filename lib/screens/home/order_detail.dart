@@ -16,9 +16,10 @@ import '../../models/order.dart';
 import '../../services/supabase_service.dart';
 import '../pickup/pickup_screen.dart'; // Ensure this path is correct
 
-const phoneNumberId = '784090628116998';
+// const phoneNumberId = '784090628116998';
+const phoneNumberId = '775998265598867';
 const accessToken =
-    'EAASuYSnOmRABPFJ4u2MpRCodcDB7hovrfhPXNlb6FynQ4WSpzzSNQCsKzFK3tZAZAmrwMZCbj3Eh5M8VabQ5Y2sOCZAMwVrxBBm5PdEgVcA0tGlILb1zG6mBVTysEMHNlq3XPMVggQb8JaROJeR59TPcfECwyV6vr92kAl4xub6pkQgZC2AzpZCDspDGhZBV0d57QZDZD';
+    'EAAQzmZAIQO8wBPXVeKJJ1vwRIEPOjus4eqZCzLnTZAs7AsZBWrTZAlUeMPftALFGIgin45fydHT1jBLZACzuCZB7eixv77A6EkMgmZBTEP8V0ymO17ThLsXBjHsPSGnVVmaBeUc8bZChsNWN7IliaEqBj1zo8mw4VBzWzFGZCG9qAyhjJKwCWyLikQ7dEcnmZB5ZBylEWQZDZD';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -53,9 +54,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _loadOrderItems();
     _loadPayments();
     // Ensure the initial amount controller text is a valid number string
-    _amountController.text =
-    (widget.order['total_price'] is num) ? widget.order['total_price'].toString() :
-    (int.tryParse(widget.order['total_price']?.toString() ?? '0') ?? 0).toString();
+    _amountController.text = (widget.order['total_price'] is num)
+        ? widget.order['total_price'].toString()
+        : (int.tryParse(widget.order['total_price']?.toString() ?? '0') ?? 0)
+              .toString();
     _loadUpiDetailsFromSupabase();
   }
 
@@ -79,12 +81,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final items = await supabaseService.fetchOrderItems(id);
     setState(() {
       // Ensure item_price and quantity are parsed to numbers if they come as strings
-      orderItems = items.map((item) => {
-        'item_type': item['item_type'],
-        'quantity': int.tryParse(item['quantity']?.toString() ?? '0') ?? 0,
-        'item_price': int.tryParse(item['item_price']?.toString() ?? '0') ?? 0,
-        // Add other fields as necessary
-      }).toList();
+      orderItems = items
+          .map(
+            (item) => {
+              'item_type': item['item_type'],
+              'quantity':
+                  int.tryParse(item['quantity']?.toString() ?? '0') ?? 0,
+              'item_price':
+                  int.tryParse(item['item_price']?.toString() ?? '0') ?? 0,
+              // Add other fields as necessary
+            },
+          )
+          .toList();
       isLoadingItems = false;
     });
   }
@@ -146,6 +154,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       setState(() {
         _currentOrderStatus = 'delivered';
       });
+      final deliveryMessage =
+          '''
+✅ Order Delivered
+
+Hi ${widget.order['customer_name']}, 👋, your order has been successfully delivered. 
+Thank you for choosing Ayaning Kadai! 🧺
+''';
+
+      try {
+        await sendTextMessageToWhatsApp(
+          widget.order['customer_phone'],
+          deliveryMessage,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Order delivered message sent via WhatsApp'),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Failed to send WhatsApp message: $e')),
+        );
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order marked as delivered')),
@@ -191,9 +222,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           : int.tryParse(order['total_price']?.toString() ?? '0') ?? 0,
       status: _currentOrderStatus,
       pickupTime:
-      DateTime.tryParse(order['pickup_time'] ?? '') ?? DateTime.now(),
+          DateTime.tryParse(order['pickup_time'] ?? '') ?? DateTime.now(),
       deliveryDueTime:
-      DateTime.tryParse(order['delivery_due_time'] ?? '') ??
+          DateTime.tryParse(order['delivery_due_time'] ?? '') ??
           DateTime.now().add(const Duration(days: 1)),
     );
 
@@ -203,7 +234,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final isPending = orderObj.status.toLowerCase() == 'pending';
     final isPickedUpOrInProcess =
         orderObj.status.toLowerCase() == 'picked_up' ||
-            orderObj.status.toLowerCase() == 'in_process';
+        orderObj.status.toLowerCase() == 'in_process';
 
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
@@ -381,9 +412,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             TextFormField(
                               controller: _amountController,
                               keyboardType:
-                              const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               decoration: const InputDecoration(
                                 labelText: 'Enter payment amount (₹)',
                                 border: OutlineInputBorder(),
@@ -457,21 +488,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               width: double.infinity,
                               child: _isLoading
                                   ? const Center(
-                                child: CircularProgressIndicator(),
-                              )
+                                      child: CircularProgressIndicator(),
+                                    )
                                   : ElevatedButton.icon(
-                                icon: const Icon(Icons.done_all),
-                                label: const Text('Mark as Delivered'),
-                                onPressed: _markAsDelivered,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
+                                      icon: const Icon(Icons.done_all),
+                                      label: const Text('Mark as Delivered'),
+                                      onPressed: _markAsDelivered,
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        textStyle: const TextStyle(
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -611,166 +642,206 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _sharePdfBill() async {
-    final pdf = pw.Document();
-    final font = pw.Font.ttf(
-      await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
-    );
+    setState(() => _isLoading = true); // optional loading indicator
+    try {
+      // 1️⃣ Generate PDF
+      final pdf = pw.Document();
+      final font = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
 
-    final customer = widget.order['customer_name'];
-    final phone = widget.order['customer_phone'];
-    final address = widget.order['customer_address'];
-    final amount = _amountController.text;
-    final date = DateFormat('dd MMM yyyy, hh:mm a').format(
-      DateTime.tryParse(widget.order['created_at'] ?? '') ?? DateTime.now(),
-    );
+      final customer = widget.order['customer_name'];
+      final phone = widget.order['customer_phone'];
+      final address = widget.order['customer_address'];
+      final amount = _amountController.text;
+      final date = DateFormat('dd MMM yyyy, hh:mm a').format(
+        DateTime.tryParse(widget.order['created_at'] ?? '') ?? DateTime.now(),
+      );
 
-    final upiId = _upiIdController.text.trim();
-    final upiName = _upiNameController.text.trim();
-    final upiUrl = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
-    final destinationUrl =
-        'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
+      final upiId = _upiIdController.text.trim();
+      final upiName = _upiNameController.text.trim();
+      final upiUrl = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
+      final destinationUrl =
+          'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-    final qrValidationResult = QrValidator.validate(
-      data: upiUrl,
-      version: QrVersions.auto,
-      errorCorrectionLevel: QrErrorCorrectLevel.M,
-    );
-    final qrCode = qrValidationResult.qrCode;
-    final painter = QrPainter.withQr(
-      qr: qrCode!,
-      color: const ui.Color(0xFF000000),
-      emptyColor: const ui.Color(0xFFFFFFFF),
-      gapless: true,
-    );
-    final picData = await painter.toImageData(200);
-    final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
+      // Generate QR code
+      final qrValidationResult = QrValidator.validate(
+        data: upiUrl,
+        version: QrVersions.auto,
+        errorCorrectionLevel: QrErrorCorrectLevel.M,
+      );
+      final qrCode = qrValidationResult.qrCode;
+      final painter = QrPainter.withQr(
+        qr: qrCode!,
+        color: const ui.Color(0xFF000000),
+        emptyColor: const ui.Color(0xFFFFFFFF),
+        gapless: true,
+      );
+      final picData = await painter.toImageData(200);
+      final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(24),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Center(
-                child: pw.Text(
-                  'Laundry Bill',
-                  style: pw.TextStyle(
-                    fontSize: 26,
-                    fontWeight: pw.FontWeight.bold,
-                    font: font,
-                  ),
-                ),
-              ),
-              pw.SizedBox(height: 24),
-              pw.Text(
-                'Customer Name: $customer',
-                style: pw.TextStyle(font: font),
-              ),
-              pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
-              pw.Text('Address: $address', style: pw.TextStyle(font: font)),
-              pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
-              pw.SizedBox(height: 24),
-              pw.Text(
-                'Items',
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Table.fromTextArray(
-                headers: ['Item Type', 'Qty', 'Price (₹)'],
-                data: orderItems
-                    .map(
-                      (item) => [
-                    item['item_type'] ?? '',
-                    '${item['quantity']}', // quantity is now guaranteed to be int
-                    '${item['item_price'] ?? 0}', // item_price is now guaranteed to be int
-                  ],
-                )
-                    .toList(),
-                headerStyle: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  font: font,
-                ),
-                cellStyle: pw.TextStyle(font: font),
-                cellAlignment: pw.Alignment.centerLeft,
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(2),
-                  1: const pw.FlexColumnWidth(1),
-                  2: const pw.FlexColumnWidth(1.5),
-                },
-              ),
-              pw.SizedBox(height: 16),
-              pw.Divider(),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text(
-                  'Total Amount: ₹$amount',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                    font: font,
-                  ),
-                ),
-              ),
-              pw.SizedBox(height: 24),
-              pw.Center(
-                child: pw.UrlLink(
-                  destination: destinationUrl,
+      // Build PDF
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
                   child: pw.Text(
-                    'Tap to Pay via UPI',
+                    'Laundry Bill',
                     style: pw.TextStyle(
-                      decoration: pw.TextDecoration.underline,
-                      color: PdfColors.blue,
+                      fontSize: 26,
+                      fontWeight: pw.FontWeight.bold,
                       font: font,
                     ),
                   ),
                 ),
-              ),
-              pw.SizedBox(height: 24),
-              pw.Divider(),
-              pw.Center(
-                child: pw.Text(
-                  'Thank you for choosing Ayaning Kadai!',
+                pw.SizedBox(height: 24),
+                pw.Text(
+                  'Customer Name: $customer',
+                  style: pw.TextStyle(font: font),
+                ),
+                pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
+                pw.Text('Address: $address', style: pw.TextStyle(font: font)),
+                pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
+                pw.SizedBox(height: 24),
+                pw.Text(
+                  'Items',
                   style: pw.TextStyle(
-                    fontSize: 14,
-                    fontStyle: pw.FontStyle.italic,
-                    font: font,
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
+                pw.SizedBox(height: 8),
+                pw.Table.fromTextArray(
+                  headers: ['Item Type', 'Qty', 'Price (₹)'],
+                  data: orderItems
+                      .map(
+                        (item) => [
+                          item['item_type'] ?? '',
+                          '${item['quantity']}',
+                          '${item['item_price'] ?? 0}',
+                        ],
+                      )
+                      .toList(),
+                  headerStyle: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    font: font,
+                  ),
+                  cellStyle: pw.TextStyle(font: font),
+                  cellAlignment: pw.Alignment.centerLeft,
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(2),
+                    1: const pw.FlexColumnWidth(1),
+                    2: const pw.FlexColumnWidth(1.5),
+                  },
+                ),
+                pw.SizedBox(height: 16),
+                pw.Divider(),
+                pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    'Total Amount: ₹$amount',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                      font: font,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Center(
+                  child: pw.UrlLink(
+                    destination: destinationUrl,
+                    child: pw.Text(
+                      'Tap to Pay via UPI',
+                      style: pw.TextStyle(
+                        decoration: pw.TextDecoration.underline,
+                        color: PdfColors.blue,
+                        font: font,
+                      ),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Divider(),
+                pw.Center(
+                  child: pw.Text(
+                    'Thank you for choosing Ayaning Kadai!',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontStyle: pw.FontStyle.italic,
+                      font: font,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    final Uint8List bytes = await pdf.save();
-    final output = await getTemporaryDirectory();
-    final file = File('${output.path}/laundry_bill.pdf');
-    await file.writeAsBytes(bytes);
+      final Uint8List bytes = await pdf.save();
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/laundry_bill.pdf');
+      await file.writeAsBytes(bytes);
 
-    final pdfUrl = await uploadPdfAndGetPublicUrl(file);
+      final pdfUrl = await uploadPdfAndGetPublicUrl(file);
 
-    final billMessage = '''
+      // Bill text message
+      final billMessage =
+          '''
 🧾 Laundry Bill
 
 Hi 👋, thanks for choosing us!
 
- Name: $customer  
- Amount: ₹$amount  
- Date: $date  
- 
+Name: $customer  
+Amount: ₹$amount  
+Date: $date  
+
 — Ayaning Kadai
 ''';
 
-    await sendPdfToWhatsApp(phone, pdfUrl);
-    await sendTextMessageToWhatsApp(phone, billMessage);
+      // 2️⃣ Send PDF via WhatsApp
+      try {
+        await sendPdfToWhatsApp(phone, pdfUrl);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ PDF sent successfully via WhatsApp')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Failed to send PDF: $e')));
+      }
+
+      // 3️⃣ Send text message via WhatsApp
+      try {
+        await sendTextMessageToWhatsApp(phone, billMessage);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Text message sent successfully via WhatsApp'),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Failed to send text message: $e')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error generating PDF or sending message: $e'),
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
+  // WhatsApp helpers
   Future<void> sendPdfToWhatsApp(String phoneNumber, String pdfUrl) async {
     final uri = Uri.parse(
       'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
@@ -791,16 +862,25 @@ Hi 👋, thanks for choosing us!
     );
 
     if (response.statusCode == 200) {
-      print('✅ PDF sent successfully to $phoneNumber');
+      // Insert into Supabase messages table
+      final newMsg = {
+        'customer_phone': phoneNumber,
+        'msg_type': 'document',
+        'message': pdfUrl,
+        'direction': 'outbound',
+        'raw_payload': {'filename': 'invoice.pdf', 'link': pdfUrl},
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
-      print('❌ PDF send failed: ${response.body}');
+      throw Exception('WhatsApp PDF send failed: ${response.body}');
     }
   }
 
   Future<void> sendTextMessageToWhatsApp(
-      String phoneNumber,
-      String message,
-      ) async {
+    String phoneNumber,
+    String message,
+  ) async {
     final uri = Uri.parse(
       'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
     );
@@ -820,9 +900,16 @@ Hi 👋, thanks for choosing us!
     );
 
     if (response.statusCode == 200) {
-      print('✅ Text message sent successfully');
+      final newMsg = {
+        'customer_phone': phoneNumber,
+        'msg_type': 'text',
+        'message': message,
+        'direction': 'outbound',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
-      print('❌ Text send failed: ${response.body}');
+      throw Exception('WhatsApp text send failed: ${response.body}');
     }
   }
 

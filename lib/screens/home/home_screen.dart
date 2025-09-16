@@ -20,11 +20,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> fetchOrderList() async {
-    final data = await supabaseService.fetchOrders();
-    setState(() {
-      orders = data;
-      isLoading = false;
-    });
+    try {
+      final data = await supabaseService.fetchOrders();
+      if (!mounted) return; // <-- prevents setState after dispose
+      setState(() {
+        orders = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+      print('❌ Error fetching orders: $e');
+    }
   }
 
   @override

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "243896338803",
+    "project_id": "ayaningkadai",
+    "storage_bucket": "ayaningkadai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243896338803:android:7fa21e6748ff33e1f49d06",
+        "android_client_info": {
+          "package_name": "com.highonswift.my_laundry"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHpdzD2JHMSDndf2OVQrSlr36XJMCGcEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

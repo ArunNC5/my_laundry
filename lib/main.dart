@@ -1,15 +1,33 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:my_laundry/providers/firebase_messaging_service_provider.dart';
 import 'package:my_laundry/screens/home/order_detail.dart';
 import 'package:my_laundry/screens/pickup/pickup_screen.dart';
+import 'package:my_laundry/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme.dart';
+import 'firebase_options.dart';
 import 'main_navigation_screen.dart';
 import 'screens/delivery/delivery_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Local notification setup
+  LocalNotificationService.initialize();
+
+  // Firebase init (for FCM)
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   await Supabase.initialize(
     url: 'https://yrbmifjjqjvrrouefuqq.supabase.co',
     anonKey:
@@ -17,6 +35,11 @@ void main() async {
   );
 
   runApp(MyApp());
+
+  await FirebaseMessaging.instance.subscribeToTopic("all");
+
+  // FCM setup in background
+  unawaited(_initFCM());
 }
 
 class MyApp extends StatelessWidget {
@@ -43,4 +66,18 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+Future<void> _initFCM() async {
+  final messagingService = FirebaseMessagingService();
+  await messagingService.setupInteractedMessage();
+  await messagingService.getDeviceToken();
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    if (message.notification != null) {
+      LocalNotificationService.showNotification(
+        message.notification!.title ?? '',
+        message.notification!.body ?? '',
+      );
+    }
+  });
 }

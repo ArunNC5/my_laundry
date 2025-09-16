@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for input formatters
 import 'package:http/http.dart' as http;
+import 'package:my_laundry/main_navigation_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/supabase_service.dart';
 import '../home/home_screen.dart';
@@ -264,6 +266,10 @@ class _PickupScreenState extends State<PickupScreen> {
         itemListBuffer.writeln("• ${item['name']} × ${item['quantity']}");
       }
 
+      String itemList = clothes
+          .map((item) => "${item['name']} × ${item['quantity']}")
+          .join(", ");
+
       String message =
           """
 🧺 *Laundry Pickup Confirmed!*
@@ -276,12 +282,17 @@ ${itemListBuffer.toString().trim()}
 📅 Estimated delivery: within 36 hours.
 
 Thank you for choosing our service!
+
+--- Ayaning Kadai
 """;
 
-      await sendTextMessageToWhatsApp(
-        "91${phoneController.text.trim()}",
-        message,
-      );
+      // await sendTemplateMessageToWhatsApp(
+      //   "91${phoneController.text.trim()}",
+      //   "pickup_confirmed",
+      //   [nameController.text.trim(), itemList],
+      // );
+
+      await sendTextMessageToWhatsApp("91${phoneController.text.trim()}", message);
 
       // Success message (depends on flow)
       ScaffoldMessenger.of(context).showSnackBar(
@@ -296,7 +307,7 @@ Thank you for choosing our service!
 
       // Navigate to Home
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
+        MaterialPageRoute(builder: (context) => MainNavigationScreen(initialIndex: 2)),
         (Route<dynamic> route) => false,
       );
     } catch (e) {
@@ -331,9 +342,61 @@ Thank you for choosing our service!
     );
 
     if (response.statusCode == 200) {
+      final newMsg = {
+        'customer_phone': phoneNumber,
+        'msg_type': 'text',
+        'message': message,
+        'direction': 'outbound',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await Supabase.instance.client.from('messages').insert(newMsg);
       print('✅ Text message sent successfully');
     } else {
       print('❌ Text send failed: ${response.body}');
+    }
+  }
+
+  Future<void> sendTemplateMessageToWhatsApp(
+    String phoneNumber,
+    String templateName,
+    List<String> parameters,
+  ) async {
+    final uri = Uri.parse(
+      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+    );
+
+    // Build components (body with parameters)
+    final components = [
+      {
+        "type": "body",
+        "parameters": parameters
+            .map((param) => {"type": "text", "text": param})
+            .toList(),
+      },
+    ];
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "messaging_product": "whatsapp",
+        "to": phoneNumber,
+        "type": "template",
+        "template": {
+          "name": templateName,
+          "language": {"code": "en"},
+          "components": components,
+        },
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('✅ Template "$templateName" sent successfully');
+    } else {
+      print('❌ Template send failed: ${response.body}');
     }
   }
 
@@ -583,7 +646,10 @@ Thank you for choosing our service!
                     textAlign: TextAlign.center,
                     softWrap: true,
                     maxLines: null, // unlimited lines
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),

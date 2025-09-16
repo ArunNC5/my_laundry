@@ -1,21 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:my_laundry/screens/chat/chat_list_screen.dart';
 import 'package:my_laundry/screens/dashboard/dashboard_screen.dart';
 import 'package:my_laundry/screens/home/home_screen.dart';
 import 'package:my_laundry/screens/services/service_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
+  final int initialIndex; // Optional parameter
+
+  const MainNavigationScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+
   @override
   _MainNavigationScreenState createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   final List<Widget> _screens = [
     DashboardScreen(), // Dashboard
     HomeScreen(), // Orders
     ServicesScreen(), // Services
+    ChatListScreen(), // Chats
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex; // Use the passed index
+  }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
@@ -65,6 +77,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               icon: Icon(Icons.design_services_outlined),
               activeIcon: Icon(Icons.design_services),
               label: 'Services',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_outlined),
+              activeIcon: Icon(Icons.chat),
+              label: 'Chats',
             ),
           ],
         ),
