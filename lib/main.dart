@@ -24,6 +24,13 @@ Future<void> main() async {
   // Firebase init (for FCM)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // 🔹 iOS: request push permission
+  await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

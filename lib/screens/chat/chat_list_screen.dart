@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_screen.dart';
@@ -170,7 +171,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
           final chat = chats[index];
           final phone = chat['customer_phone'];
           final message = chat['message'] ?? '';
-          final createdAt = DateTime.tryParse(chat['created_at'] ?? '');
+          final createdAtUtc = DateTime.tryParse(chat['created_at'] ?? '');
+          final createdAtLocal = createdAtUtc?.toLocal();
+          final formattedTime = createdAtLocal != null
+              ? DateFormat('hh:mm a').format(createdAtLocal)
+              : '';
 
           return ListTile(
             leading: const CircleAvatar(child: Icon(Icons.person)),
@@ -180,22 +185,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: _unreadCount[phone] != null &&
-                _unreadCount[phone]! > 0
+            trailing: _unreadCount[phone] != null && _unreadCount[phone]! > 0
                 ? CircleAvatar(
               radius: 12,
               backgroundColor: Colors.red,
               child: Text(
                 _unreadCount[phone]!.toString(),
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 12),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             )
-                : createdAt != null
+                : formattedTime.isNotEmpty
                 ? Text(
-              "${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}",
-              style: const TextStyle(
-                  fontSize: 12, color: Colors.grey),
+              formattedTime,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             )
                 : null,
             onTap: () => _openChat(phone),
