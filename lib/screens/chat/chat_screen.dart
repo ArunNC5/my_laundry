@@ -11,7 +11,6 @@ import 'package:just_audio/just_audio.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:video_player/video_player.dart';
 
@@ -107,7 +106,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
 
     try {
-      final uri = Uri.parse('https://graph.facebook.com/v22.0/$phoneNumberId/messages');
+      final uri = Uri.parse(
+        'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      );
 
       Map<String, dynamic> body;
       String msgTypeForSupabase;
@@ -138,7 +139,9 @@ class _ChatScreenState extends State<ChatScreen> {
         if (caption != null && caption.isNotEmpty) {
           mediaPayload["caption"] = caption;
         }
-        if (mediaType == "document" && fileName != null && fileName.isNotEmpty) {
+        if (mediaType == "document" &&
+            fileName != null &&
+            fileName.isNotEmpty) {
           mediaPayload["filename"] = fileName;
         }
 
@@ -188,9 +191,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
     }
   }
 
@@ -379,7 +382,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-
   // ------------------- Attachment Sheet -------------------
   void _showAttachmentOptions(BuildContext context) {
     showModalBottomSheet(
@@ -550,75 +552,120 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   // ------------------- Text Bubble -------------------
-  Widget _buildTextBubble(Map msg, bool isMe) => Align(
-    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isMe ? Colors.deepPurple.shade400 : Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 4,
-            offset: const Offset(2, 2),
+  Widget _buildTextBubble(Map msg, bool isMe) {
+    final text = msg['message'] ?? '';
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
+        : '';
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        margin: EdgeInsets.only(
+          top: 3,
+          bottom: 3,
+          left: isMe ? 40 : 8,
+          right: isMe ? 8 : 40,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFFE1FFC7) : Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 0),
+            bottomRight: Radius.circular(isMe ? 0 : 16),
           ),
-        ],
-      ),
-      child: Text(
-        msg['message'] ?? '',
-        style: TextStyle(
-          color: isMe ? Colors.white : Colors.black87,
-          fontSize: 14,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 2,
+              offset: const Offset(1, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Text content
+            Flexible(
+              child: Text(
+                text,
+                style: const TextStyle(fontSize: 15, color: Colors.black87),
+              ),
+            ),
+
+            // Spacer between text and timestamp
+            const SizedBox(width: 8),
+
+            // Time (and optional ticks later)
+            Text(
+              formattedTime,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 
   // ------------------- Image Bubble -------------------
   Widget _buildImageBubble(Map msg, bool isMe) {
     final url = msg['message'] ?? '';
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
+        : '';
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        onTap: () {
-          if (url.isNotEmpty) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  backgroundColor: Colors.black,
-                  body: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Center(child: Image.network(url)),
-                  ),
-                ),
+      child: Container(
+        margin: EdgeInsets.only(
+          top: 4,
+          bottom: 4,
+          left: isMe ? 50 : 8,
+          right: isMe ? 8 : 50,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 3,
+              offset: const Offset(1, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                width: MediaQuery.of(context).size.width * 0.65,
+                height: MediaQuery.of(context).size.width * 0.65,
               ),
-            );
-          }
-        },
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          width: MediaQuery.of(context).size.width * 0.6,
-          height: MediaQuery.of(context).size.width * 0.6,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 6,
-                offset: const Offset(2, 4),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.network(url, fit: BoxFit.cover),
-          ),
+              margin: const EdgeInsets.all(6),
+              child: Text(
+                formattedTime,
+                style: const TextStyle(fontSize: 11, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -627,6 +674,11 @@ class _ChatScreenState extends State<ChatScreen> {
   // ------------------- Video Bubble -------------------
   Widget _buildVideoBubble(Map msg, bool isMe) {
     final url = msg['message'] ?? '';
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
+        : '';
+
     if (!_videoControllers.containsKey(url)) {
       _videoControllers[url] = VideoPlayerController.network(url)
         ..initialize().then((_) => setState(() {}));
@@ -636,87 +688,69 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        width: MediaQuery.of(context).size.width * 0.6,
+        margin: EdgeInsets.only(
+          top: 4,
+          bottom: 4,
+          left: isMe ? 50 : 8,
+          right: isMe ? 8 : 50,
+        ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.black12,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 3,
+              offset: const Offset(1, 2),
+            ),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AspectRatio(
-                aspectRatio: controller.value.isInitialized
-                    ? controller.value.aspectRatio
-                    : 16 / 9,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    controller.value.isInitialized
-                        ? VideoPlayer(controller)
-                        : const Center(child: CircularProgressIndicator()),
-                    if (controller.value.isInitialized)
-                      Positioned(
-                        bottom: 8,
-                        left: 8,
-                        right: 8,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Play/Pause button
-                            IconButton(
-                              icon: Icon(
-                                controller.value.isPlaying
-                                    ? Icons.pause_circle
-                                    : Icons.play_circle,
-                                color: Colors.white,
-                                size: 36,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  controller.value.isPlaying
-                                      ? controller.pause()
-                                      : controller.play();
-                                });
-                              },
-                            ),
-                            // Forward 10 seconds
-                            IconButton(
-                              icon: const Icon(
-                                Icons.forward_10,
-                                color: Colors.white,
-                                size: 36,
-                              ),
-                              onPressed: () {
-                                final newPosition =
-                                    controller.value.position + const Duration(seconds: 10);
-                                controller.seekTo(
-                                  newPosition < controller.value.duration
-                                      ? newPosition
-                                      : controller.value.duration,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: controller.value.isInitialized
+                  ? AspectRatio(
+                      aspectRatio: controller.value.aspectRatio,
+                      child: VideoPlayer(controller),
+                    )
+                  : const SizedBox(
+                      height: 200,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+            ),
+            IconButton(
+              icon: Icon(
+                controller.value.isPlaying
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_fill,
+                color: Colors.white,
+                size: 48,
+              ),
+              onPressed: () {
+                setState(() {
+                  controller.value.isPlaying
+                      ? controller.pause()
+                      : controller.play();
+                });
+              },
+            ),
+            Positioned(
+              bottom: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  formattedTime,
+                  style: const TextStyle(fontSize: 11, color: Colors.white),
                 ),
               ),
-              // Progress bar
-              VideoProgressIndicator(
-                controller,
-                allowScrubbing: true,
-                colors: VideoProgressColors(
-                  playedColor: Colors.deepPurple,
-                  backgroundColor: Colors.grey.shade400,
-                  bufferedColor: Colors.grey.shade300,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -725,6 +759,11 @@ class _ChatScreenState extends State<ChatScreen> {
   // ------------------- Audio Bubble -------------------
   Widget _buildAudioBubble(Map msg, bool isMe) {
     final url = msg['message'] ?? '';
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
+        : '';
+
     if (!_audioPlayers.containsKey(url)) {
       _audioPlayers[url] = AudioPlayer()..setUrl(url);
     }
@@ -733,14 +772,35 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: EdgeInsets.only(
+          top: 4,
+          bottom: 4,
+          left: isMe ? 50 : 8,
+          right: isMe ? 8 : 50,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        width: MediaQuery.of(context).size.width * 0.65,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.7,
+        ),
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(16),
+          color: isMe ? const Color(0xFFE1FFC7) : Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 0),
+            bottomRight: Radius.circular(isMe ? 0 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 2,
+              offset: const Offset(1, 2),
+            ),
+          ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             StreamBuilder<PlayerState>(
               stream: player.playerStateStream,
@@ -754,13 +814,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 return IconButton(
                   icon: Icon(
                     isPlaying && !isCompleted
-                        ? Icons.pause_circle
-                        : Icons.play_circle,
-                    size: 32,
-                    color: Colors.deepPurple,
+                        ? Icons.pause_circle_filled
+                        : Icons.play_circle_fill,
+                    size: 34,
+                    color: Colors.teal,
                   ),
                   onPressed: () async {
-                    // Stop all other players
+                    // Pause all others
                     for (final entry in _audioPlayers.entries) {
                       final p = entry.value;
                       if (p != player) {
@@ -769,51 +829,56 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
                     }
 
-                    // If completed, reset to start and play immediately
                     if (isCompleted) {
                       await player.seek(Duration.zero);
                       await player.play();
-                      return; // exit so we don't toggle again
+                      return;
                     }
 
-                    // Normal toggle
                     if (player.playing) {
                       await player.pause();
                     } else {
                       await player.play();
                     }
                   },
-
                 );
               },
             ),
             Expanded(
-              child: StreamBuilder<Duration>(
-                stream: player.positionStream,
-                builder: (context, snapshot) {
-                  final pos = snapshot.data ?? Duration.zero;
-                  final total = player.duration ?? Duration.zero;
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    StreamBuilder<Duration>(
+                      stream: player.positionStream,
+                      builder: (context, snapshot) {
+                        final pos = snapshot.data ?? Duration.zero;
+                        final total = player.duration ?? Duration.zero;
+                        double progress = 0;
+                        if (total.inMilliseconds > 0) {
+                          progress = pos.inMilliseconds / total.inMilliseconds;
+                          if (progress > 1.0) progress = 1.0;
+                        }
 
-                  double progress = 0;
-                  if (total.inMilliseconds > 0) {
-                    progress = pos.inMilliseconds / total.inMilliseconds;
-                    if (progress > 1.0) progress = 1.0;
-                  }
-
-                  return StreamBuilder<ProcessingState>(
-                    stream: player.processingStateStream,
-                    builder: (context, psSnapshot) {
-                      final processingState = psSnapshot.data;
-                      final isCompleted =
-                          processingState == ProcessingState.completed;
-                      return LinearProgressIndicator(
-                        value: isCompleted ? 0 : progress,
-                        color: Colors.deepPurple,
-                        backgroundColor: Colors.grey.shade400,
-                      );
-                    },
-                  );
-                },
+                        return LinearProgressIndicator(
+                          value: progress,
+                          color: Colors.teal,
+                          backgroundColor: Colors.grey.shade300,
+                          minHeight: 2.2,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formattedTime,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -822,80 +887,51 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-
   // ------------------- Document Bubble -------------------
   Widget _buildDocBubble(Map msg, bool isMe) {
     final url = msg['message'] ?? '';
     final name = msg['file_name'] ?? 'Document';
-    final ext = name.split('.').last.toUpperCase();
-    final size = msg['file_size'] != null
-        ? '${(msg['file_size'] / 1024).toStringAsFixed(1)} KB'
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
         : '';
-
-    // Optional: choose icon based on file type
-    IconData fileIcon;
-    Color bgColor;
-    switch (ext) {
-      case 'PDF':
-        fileIcon = Icons.picture_as_pdf;
-        bgColor = Colors.red.shade100;
-        break;
-      case 'DOC':
-      case 'DOCX':
-        fileIcon = Icons.description;
-        bgColor = Colors.blue.shade100;
-        break;
-      case 'XLS':
-      case 'XLSX':
-        fileIcon = Icons.grid_on;
-        bgColor = Colors.green.shade100;
-        break;
-      default:
-        fileIcon = Icons.insert_drive_file;
-        bgColor = Colors.grey.shade300;
-    }
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
-        onTap: () {
-          if (url.isNotEmpty) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(
-                    title: Text(name),
-                    backgroundColor: Colors.deepPurple,
-                  ),
-                  body: SfPdfViewer.network(url),
-                ),
-              ),
-            );
+        onTap: () async {
+          if (await canLaunchUrlString(url)) {
+            launchUrlString(url, mode: LaunchMode.externalApplication);
           }
         },
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.all(12),
+          margin: EdgeInsets.only(
+            top: 4,
+            bottom: 4,
+            left: isMe ? 50 : 8,
+            right: isMe ? 8 : 50,
+          ),
+          padding: const EdgeInsets.all(10),
           width: MediaQuery.of(context).size.width * 0.65,
           decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(16),
+            color: isMe ? const Color(0xFFE1FFC7) : Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : 0),
+              bottomRight: Radius.circular(isMe ? 0 : 16),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black26,
-                blurRadius: 4,
-                offset: const Offset(2, 2),
+                color: Colors.black12,
+                blurRadius: 2,
+                offset: const Offset(1, 2),
               ),
             ],
           ),
           child: Row(
             children: [
-              Icon(
-                fileIcon,
-                size: 40,
-                color: Colors.grey.shade800,
-              ),
+              Icon(Icons.insert_drive_file, color: Colors.teal, size: 36),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -903,30 +939,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$ext • $size',
+                      formattedTime,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: Colors.grey.shade700,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_circle_down, color: Colors.grey),
             ],
           ),
         ),
       ),
     );
   }
-
 
   // ------------------- Location Bubble -------------------
   Widget _buildLocationBubble(Map msg, bool isMe) {
@@ -935,6 +971,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (lat == null || lng == null) {
       return _buildTextBubble({'message': 'Location unavailable'}, isMe);
     }
+
+    final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
+    final formattedTime = createdAt != null
+        ? DateFormat('hh:mm a').format(createdAt.toLocal())
+        : '';
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -945,70 +986,54 @@ class _ChatScreenState extends State<ChatScreen> {
           launchUrlString(googleMapsUrl, mode: LaunchMode.externalApplication);
         },
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          width: MediaQuery.of(context).size.width * 0.65,
-          height: MediaQuery.of(context).size.width * 0.45,
+          margin: EdgeInsets.only(
+            top: 4,
+            bottom: 4,
+            left: isMe ? 50 : 8,
+            right: isMe ? 8 : 50,
+          ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [Colors.grey.shade200, Colors.grey.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMe ? 16 : 0),
+              bottomRight: Radius.circular(isMe ? 0 : 16),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black26,
-                blurRadius: 6,
-                offset: Offset(2, 4),
+                color: Colors.black12,
+                blurRadius: 2,
+                offset: const Offset(1, 2),
               ),
             ],
           ),
           child: Stack(
-            alignment: Alignment.center,
             children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white70,
-                    child: const Icon(
-                      Icons.location_on,
-                      size: 40,
-                      color: Colors.redAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  "https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x400&markers=color:red%7C$lat,$lng&key=YOUR_GOOGLE_MAPS_API_KEY",
+                  fit: BoxFit.cover,
+                  width: MediaQuery.of(context).size.width * 0.65,
+                  height: 200,
+                ),
               ),
               Positioned(
-                bottom: 0,
+                bottom: 6,
+                right: 6,
                 child: Container(
-                  width: MediaQuery.of(context).size.width * 0.65,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.black54, Colors.transparent],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(16),
-                    ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
                   ),
-                  child: const Text(
-                    'Location',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    formattedTime,
+                    style: const TextStyle(fontSize: 11, color: Colors.white),
                   ),
                 ),
               ),
@@ -1028,25 +1053,28 @@ class _ChatScreenState extends State<ChatScreen> {
     for (var msg in messages) {
       final createdAt = DateTime.parse(msg['created_at']);
       final dateStr = DateFormat('yyyy-MM-dd').format(createdAt);
+
+      // Date header ("Today", "Yesterday")
       if (lastDate != dateStr) {
         lastDate = dateStr;
         widgets.add(
           Center(
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
+              margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.shade300,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 formatDateHeader(createdAt),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: const TextStyle(fontSize: 12, color: Colors.black87),
               ),
             ),
           ),
         );
       }
+
       final isMe = msg['direction'] == 'outbound';
       widgets.add(_buildMessageBubble(msg, isMe));
     }
@@ -1068,12 +1096,58 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.phone),
-        backgroundColor: Colors.deepPurple,
+        automaticallyImplyLeading: true,
+        backgroundColor: const Color(0xFF075E54),
+        // WhatsApp green
+        elevation: 0,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            const SizedBox(width: 8),
+
+            // ✅ Profile avatar
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.grey.shade300,
+              child: Text(
+                widget.phone.substring(widget.phone.length - 2),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // ✅ Contact name / number
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.phone,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    "online", // optional: make dynamic later
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // ✅ Keep your resolve icon here
         actions: [
           IconButton(
-            icon: const Icon(Icons.assignment_turned_in),
+            icon: const Icon(Icons.assignment_turned_in, color: Colors.white),
             onPressed: _resolveChat,
+            tooltip: "Resolve Chat",
           ),
         ],
       ),
@@ -1088,50 +1162,98 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_isUploading) const LinearProgressIndicator(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: Colors.grey.shade100,
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.attach_file),
-                  onPressed: () => _showAttachmentOptions(context),
-                ),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: const Color(0xFFEDEDED), // WhatsApp background grey
+            child: SafeArea(
+              child: Row(
+                children: [
+                  // Emoji button (optional placeholder)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.emoji_emotions_outlined,
+                      color: Colors.grey,
                     ),
-                    child: TextField(
-                      controller: _controller,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        hintText: "Type a message...",
-                        border: InputBorder.none,
-                        isDense: true,
+                    onPressed: () {},
+                  ),
+
+                  // Text input area
+                  // 💬 Text input area — clean WhatsApp style
+                  Expanded(
+                    child: Container(
+                      height: 45, // fixed height gives perfect alignment
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                      onSubmitted: (value) => _sendMessage(text: value),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _controller,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: const TextStyle(fontSize: 15),
+                              decoration: const InputDecoration(
+                                hintText: "Message",
+                                hintStyle: TextStyle(color: Colors.grey),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                fillColor: Colors.transparent,
+                              ),
+                              onSubmitted: (value) => _sendMessage(text: value),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.attach_file,
+                              color: Colors.grey,
+                            ),
+                            splashRadius: 22,
+                            onPressed: () => _showAttachmentOptions(context),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.grey,
+                            ),
+                            splashRadius: 22,
+                            onPressed: _pickAndSendImage,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _sendMessage(text: _controller.text.trim()),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF6A11CB),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.send,
-                      color: Colors.white,
-                      size: 22,
+
+                  const SizedBox(width: 6),
+
+                  // ✅ Send button
+                  GestureDetector(
+                    onTap: () {
+                      final text = _controller.text.trim();
+                      if (text.isNotEmpty) {
+                        _sendMessage(text: text);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366), // WhatsApp green
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.send,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

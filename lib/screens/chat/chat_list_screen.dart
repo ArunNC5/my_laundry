@@ -24,7 +24,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _subscribeToRealtime();
   }
 
-  // Load initial chats and unread counts
   Future<void> _loadChats() async {
     final response = await supabase
         .from('messages')
@@ -73,6 +72,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
       callback: (payload) => _handleRealtime(payload.newRecord),
     );
 
+    _channel.onPostgresChanges(
+      event: PostgresChangeEvent.delete,
+      schema: 'public',
+      table: 'messages',
+      callback: (payload) => _handleDeleteRealtime(payload.oldRecord),
+    );
+
     _channel.subscribe();
   }
 
@@ -91,6 +97,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
       } else if (newMsg['is_read'] == true) {
         _unreadCount[phone] = 0;
       }
+    });
+  }
+
+  void _handleDeleteRealtime(Map<String, dynamic>? oldMsg) {
+    if (oldMsg == null) return;
+    final phone = oldMsg['customer_phone'] as String?;
+    if (phone == null) return;
+
+    setState(() {
+      chats.removeWhere((chat) => chat['customer_phone'] == phone);
+      _unreadCount.remove(phone);
     });
   }
 
@@ -120,26 +137,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: const Color(0xFFF0F2F5), // WhatsApp BG
       appBar: AppBar(
-        title: const Text(
-          'Chats',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            letterSpacing: 0.5,
-          ),
-        ),
+        backgroundColor: const Color(0xFF075E54), // WhatsApp Green
         elevation: 0,
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        title: const Text(
+          'WhatsApp Chats',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            color: Colors.white,
+            letterSpacing: 0.3,
           ),
         ),
       ),
@@ -151,106 +159,135 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       )
           : ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.zero,
         itemCount: chats.length,
         itemBuilder: (context, index) {
           final chat = chats[index];
           final phone = chat['customer_phone'];
           final message = chat['message'] ?? '';
-          final createdAtUtc = DateTime.tryParse(chat['created_at'] ?? '');
+          final createdAtUtc =
+          DateTime.tryParse(chat['created_at'] ?? '');
           final createdAtLocal = createdAtUtc?.toLocal();
           final formattedTime = createdAtLocal != null
               ? DateFormat('hh:mm a').format(createdAtLocal)
               : '';
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: InkWell(
-              onTap: () => _openChat(phone),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Colors.white, Color(0xFFF0F0F0)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
-                      offset: const Offset(2, 4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Colors.deepPurple.shade400,
-                      child: Text(
-                        phone.substring(phone.length - 2),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            phone,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            message,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+          final bool hasUnread =
+              _unreadCount[phone] != null && _unreadCount[phone]! > 0;
+
+          return InkWell(
+            onTap: () => _openChat(phone),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    child: Row(
                       children: [
-                        if (_unreadCount[phone] != null && _unreadCount[phone]! > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.redAccent.withOpacity(0.4),
-                                  blurRadius: 4,
-                                  offset: const Offset(1, 2),
-                                ),
-                              ],
+                        // 🟢 Avatar
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: const Color(0xFF25D366),
+                          child: Text(
+                            (phone != null && phone.length >= 2)
+                                ? phone.substring(phone.length - 2)
+                                : (phone ?? '?'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Text(
-                              _unreadCount[phone]!.toString(),
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          )
-                        else if (formattedTime.isNotEmpty)
-                          Text(
-                            formattedTime,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                           ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // 💬 Chat preview
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Phone (or name)
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      phone,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    formattedTime,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: hasUnread
+                                          ? const Color(0xFF25D366)
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+
+                              // Last message + unread badge
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      message,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: hasUnread
+                                            ? Colors.black
+                                            : Colors.grey.shade700,
+                                        fontWeight: hasUnread
+                                            ? FontWeight.w500
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                  if (hasUnread)
+                                    Container(
+                                      margin:
+                                      const EdgeInsets.only(left: 6),
+                                      width: 20,
+                                      height: 20,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF25D366),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        _unreadCount[phone]!.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    indent: 70,
+                  ),
+                ],
               ),
             ),
           );
