@@ -270,29 +270,29 @@ class _PickupScreenState extends State<PickupScreen> {
           .map((item) => "${item['name']} × ${item['quantity']}")
           .join(", ");
 
-      String message =
-          """
-🧺 *Laundry Pickup Confirmed!*
+//       String message =
+//           """
+// 🧺 *Laundry Pickup Confirmed!*
+//
+// Hello ${nameController.text.trim()},
+// We have picked up your laundry items:
+//
+// ${itemListBuffer.toString().trim()}
+//
+// 📅 Estimated delivery: within 36 hours.
+//
+// Thank you for choosing our service!
+//
+// --- Ayaning Kadai
+// """;
 
-Hello ${nameController.text.trim()},
-We have picked up your laundry items:
+      await sendTemplateMessageToWhatsApp(
+        "91${phoneController.text.trim()}",
+        "pickup_confirmed",
+        [nameController.text.trim(), itemList],
+      );
 
-${itemListBuffer.toString().trim()}
-
-📅 Estimated delivery: within 36 hours.
-
-Thank you for choosing our service!
-
---- Ayaning Kadai
-""";
-
-      // await sendTemplateMessageToWhatsApp(
-      //   "91${phoneController.text.trim()}",
-      //   "pickup_confirmed",
-      //   [nameController.text.trim(), itemList],
-      // );
-
-      await sendTextMessageToWhatsApp("91${phoneController.text.trim()}", message);
+      // await sendTextMes sageToWhatsApp("91${phoneController.text.trim()}", message);
 
       // Success message (depends on flow)
       ScaffoldMessenger.of(context).showSnackBar(
@@ -386,7 +386,7 @@ Thank you for choosing our service!
         "type": "template",
         "template": {
           "name": templateName,
-          "language": {"code": "en"},
+          "language": {"code": "en_US"},
           "components": components,
         },
       }),

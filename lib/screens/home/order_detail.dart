@@ -642,13 +642,11 @@ Thank you for choosing Ayaning Kadai! 🧺
   }
 
   Future<void> _sharePdfBill() async {
-    setState(() => _isLoading = true); // optional loading indicator
+    setState(() => _isLoading = true);
     try {
       // 1️⃣ Generate PDF
       final pdf = pw.Document();
-      final font = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
-      );
+      final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
 
       final customer = widget.order['customer_name'];
       final phone = widget.order['customer_phone'];
@@ -664,7 +662,7 @@ Thank you for choosing Ayaning Kadai! 🧺
       final destinationUrl =
           'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-      // Generate QR code
+      // Generate QR Code for UPI link
       final qrValidationResult = QrValidator.validate(
         data: upiUrl,
         version: QrVersions.auto,
@@ -680,7 +678,7 @@ Thank you for choosing Ayaning Kadai! 🧺
       final picData = await painter.toImageData(200);
       final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
 
-      // Build PDF
+      // Build PDF layout
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -700,44 +698,25 @@ Thank you for choosing Ayaning Kadai! 🧺
                   ),
                 ),
                 pw.SizedBox(height: 24),
-                pw.Text(
-                  'Customer Name: $customer',
-                  style: pw.TextStyle(font: font),
-                ),
+                pw.Text('Customer Name: $customer', style: pw.TextStyle(font: font)),
                 pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
                 pw.Text('Address: $address', style: pw.TextStyle(font: font)),
                 pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
                 pw.SizedBox(height: 24),
-                pw.Text(
-                  'Items',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
+                pw.Text('Items', style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                )),
                 pw.SizedBox(height: 8),
                 pw.Table.fromTextArray(
                   headers: ['Item Type', 'Qty', 'Price (₹)'],
-                  data: orderItems
-                      .map(
-                        (item) => [
-                          item['item_type'] ?? '',
-                          '${item['quantity']}',
-                          '${item['item_price'] ?? 0}',
-                        ],
-                      )
-                      .toList(),
-                  headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    font: font,
-                  ),
+                  data: orderItems.map((item) => [
+                    item['item_type'] ?? '',
+                    '${item['quantity']}',
+                    '${item['item_price'] ?? 0}',
+                  ]).toList(),
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: font),
                   cellStyle: pw.TextStyle(font: font),
-                  cellAlignment: pw.Alignment.centerLeft,
-                  columnWidths: {
-                    0: const pw.FlexColumnWidth(2),
-                    1: const pw.FlexColumnWidth(1),
-                    2: const pw.FlexColumnWidth(1.5),
-                  },
                 ),
                 pw.SizedBox(height: 16),
                 pw.Divider(),
@@ -767,6 +746,8 @@ Thank you for choosing Ayaning Kadai! 🧺
                   ),
                 ),
                 pw.SizedBox(height: 24),
+                pw.Center(child: pw.Image(qrImage, width: 100, height: 100)),
+                pw.SizedBox(height: 24),
                 pw.Divider(),
                 pw.Center(
                   child: pw.Text(
@@ -784,16 +765,34 @@ Thank you for choosing Ayaning Kadai! 🧺
         ),
       );
 
+      // Save PDF
       final Uint8List bytes = await pdf.save();
       final output = await getTemporaryDirectory();
       final file = File('${output.path}/laundry_bill.pdf');
       await file.writeAsBytes(bytes);
-
       final pdfUrl = await uploadPdfAndGetPublicUrl(file);
 
-      // Bill text message
-      final billMessage =
-          '''
+      // 2️⃣ Try sending via WhatsApp Template first
+      try {
+        await sendBillTemplateWithPdf(
+          phoneNumber: phone,
+          customerName: customer,
+          amount: amount,
+          date: date,
+          pdfUrl: pdfUrl,
+          payUrl: destinationUrl,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Template sent successfully via WhatsApp')),
+        );
+      } catch (e) {
+        // ⚠️ Fallback: send plain PDF + text
+        debugPrint('Template failed: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('⚠️ Template failed. Sending regular PDF instead...')),
+        );
+
+        final billMessage = '''
 🧾 Laundry Bill
 
 Hi 👋, thanks for choosing us!
@@ -805,36 +804,21 @@ Date: $date
 — Ayaning Kadai
 ''';
 
-      // 2️⃣ Send PDF via WhatsApp
-      try {
-        await sendPdfToWhatsApp(phone, pdfUrl);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ PDF sent successfully via WhatsApp')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Failed to send PDF: $e')));
-      }
-
-      // 3️⃣ Send text message via WhatsApp
-      try {
-        await sendTextMessageToWhatsApp(phone, billMessage);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Text message sent successfully via WhatsApp'),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Failed to send text message: $e')),
-        );
+        try {
+          await sendPdfToWhatsApp(phone, pdfUrl);
+          await sendTextMessageToWhatsApp(phone, billMessage);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Fallback PDF & text sent successfully')),
+          );
+        } catch (fallbackError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('❌ Fallback also failed: $fallbackError')),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Error generating PDF or sending message: $e'),
-        ),
+        SnackBar(content: Text('❌ Error generating PDF: $e')),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -908,6 +892,81 @@ Date: $date
       await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
       throw Exception('WhatsApp text send failed: ${response.body}');
+    }
+  }
+
+  Future<void> sendBillTemplateWithPdf({
+    required String phoneNumber,
+    required String customerName,
+    required String amount,
+    required String date,
+    required String pdfUrl,
+    String? payUrl,
+  }) async {
+    final uri = Uri.parse(
+      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+    );
+
+    const templateName = "laundry_invoice";
+
+    final body = {
+      "messaging_product": "whatsapp",
+      "to": phoneNumber,
+      "type": "template",
+      "template": {
+        "name": templateName,
+        "language": {"code": "en"},
+        "components": [
+          {
+            "type": "header",
+            "parameters": [
+              {
+                "type": "document",
+                "document": {"link": pdfUrl, "filename": "Laundry_Bill.pdf"},
+              },
+            ],
+          },
+          {
+            "type": "body",
+            "parameters": [
+              {"type": "text", "text": customerName},
+              {"type": "text", "text": amount},
+              {"type": "text", "text": date},
+            ],
+          },
+          // if (payUrl != null)
+          //   {
+          //     "type": "button",
+          //     "sub_type": "url",
+          //     "index": "0",
+          //     "parameters": [
+          //       {"type": "text", "text": payUrl},
+          //     ],
+          //   },
+        ],
+      },
+    };
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      // ✅ Log it in Supabase messages
+      await Supabase.instance.client.from('messages').insert({
+        'customer_phone': phoneNumber,
+        'msg_type': 'template',
+        'message': 'Laundry Bill Template (PDF Header)',
+        'direction': 'outbound',
+        'raw_payload': body,
+      });
+    } else {
+      throw Exception('Template send failed: ${response.body}');
     }
   }
 
