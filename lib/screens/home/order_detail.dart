@@ -960,8 +960,8 @@ Date: $date
       // ✅ Log it in Supabase messages
       await Supabase.instance.client.from('messages').insert({
         'customer_phone': phoneNumber,
-        'msg_type': 'template',
-        'message': 'Laundry Bill Template (PDF Header)',
+        'msg_type': 'text',
+        'message': 'Laundry Bill Template sent successfully',
         'direction': 'outbound',
         'raw_payload': body,
       });
