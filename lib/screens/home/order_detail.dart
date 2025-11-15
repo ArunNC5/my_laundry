@@ -907,7 +907,7 @@ Date: $date
       'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
     );
 
-    const templateName = "laundry_invoice";
+    const templateName = "laundry_invoice_v1";
 
     final body = {
       "messaging_product": "whatsapp",
@@ -915,7 +915,7 @@ Date: $date
       "type": "template",
       "template": {
         "name": templateName,
-        "language": {"code": "en"},
+        "language": {"code": "en_US"},
         "components": [
           {
             "type": "header",
