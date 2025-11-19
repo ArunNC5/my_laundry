@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:my_laundry/core/constants.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -17,9 +18,6 @@ import '../../services/supabase_service.dart';
 import '../pickup/pickup_screen.dart'; // Ensure this path is correct
 
 // const phoneNumberId = '784090628116998';
-const phoneNumberId = '912562591937026';
-const accessToken =
-    'EAAQzmZAIQO8wBPXVeKJJ1vwRIEPOjus4eqZCzLnTZAs7AsZBWrTZAlUeMPftALFGIgin45fydHT1jBLZACzuCZB7eixv77A6EkMgmZBTEP8V0ymO17ThLsXBjHsPSGnVVmaBeUc8bZChsNWN7IliaEqBj1zo8mw4VBzWzFGZCG9qAyhjJKwCWyLikQ7dEcnmZB5ZBylEWQZDZD';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -646,7 +644,9 @@ Thank you for choosing Ayaning Kadai! 🧺
     try {
       // 1️⃣ Generate PDF
       final pdf = pw.Document();
-      final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+      final font = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
 
       final customer = widget.order['customer_name'];
       final phone = widget.order['customer_phone'];
@@ -698,24 +698,37 @@ Thank you for choosing Ayaning Kadai! 🧺
                   ),
                 ),
                 pw.SizedBox(height: 24),
-                pw.Text('Customer Name: $customer', style: pw.TextStyle(font: font)),
+                pw.Text(
+                  'Customer Name: $customer',
+                  style: pw.TextStyle(font: font),
+                ),
                 pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
                 pw.Text('Address: $address', style: pw.TextStyle(font: font)),
                 pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
                 pw.SizedBox(height: 24),
-                pw.Text('Items', style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                )),
+                pw.Text(
+                  'Items',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
                 pw.SizedBox(height: 8),
                 pw.Table.fromTextArray(
                   headers: ['Item Type', 'Qty', 'Price (₹)'],
-                  data: orderItems.map((item) => [
-                    item['item_type'] ?? '',
-                    '${item['quantity']}',
-                    '${item['item_price'] ?? 0}',
-                  ]).toList(),
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: font),
+                  data: orderItems
+                      .map(
+                        (item) => [
+                          item['item_type'] ?? '',
+                          '${item['quantity']}',
+                          '${item['item_price'] ?? 0}',
+                        ],
+                      )
+                      .toList(),
+                  headerStyle: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    font: font,
+                  ),
                   cellStyle: pw.TextStyle(font: font),
                 ),
                 pw.SizedBox(height: 16),
@@ -783,16 +796,21 @@ Thank you for choosing Ayaning Kadai! 🧺
           payUrl: destinationUrl,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Template sent successfully via WhatsApp')),
+          const SnackBar(
+            content: Text('✅ Template sent successfully via WhatsApp'),
+          ),
         );
       } catch (e) {
         // ⚠️ Fallback: send plain PDF + text
         debugPrint('Template failed: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Template failed. Sending regular PDF instead...')),
+          SnackBar(
+            content: Text('⚠️ Template failed. Sending regular PDF instead...'),
+          ),
         );
 
-        final billMessage = '''
+        final billMessage =
+            '''
 🧾 Laundry Bill
 
 Hi 👋, thanks for choosing us!
@@ -808,7 +826,9 @@ Date: $date
           await sendPdfToWhatsApp(phone, pdfUrl);
           await sendTextMessageToWhatsApp(phone, billMessage);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Fallback PDF & text sent successfully')),
+            const SnackBar(
+              content: Text('✅ Fallback PDF & text sent successfully'),
+            ),
           );
         } catch (fallbackError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -817,9 +837,9 @@ Date: $date
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error generating PDF: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error generating PDF: $e')));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -828,13 +848,13 @@ Date: $date
   // WhatsApp helpers
   Future<void> sendPdfToWhatsApp(String phoneNumber, String pdfUrl) async {
     final uri = Uri.parse(
-      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
     );
 
     final response = await http.post(
       uri,
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        'Authorization': 'Bearer ${AppConstants.accessToken}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -853,6 +873,7 @@ Date: $date
         'message': pdfUrl,
         'direction': 'outbound',
         'raw_payload': {'filename': 'invoice.pdf', 'link': pdfUrl},
+        'store_id': AppConstants.storeId,
       };
       await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
@@ -865,13 +886,13 @@ Date: $date
     String message,
   ) async {
     final uri = Uri.parse(
-      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
     );
 
     final response = await http.post(
       uri,
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        'Authorization': 'Bearer ${AppConstants.accessToken}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -888,6 +909,7 @@ Date: $date
         'msg_type': 'text',
         'message': message,
         'direction': 'outbound',
+        'store_id': AppConstants.storeId,
       };
       await Supabase.instance.client.from('messages').insert(newMsg);
     } else {
@@ -904,7 +926,7 @@ Date: $date
     String? payUrl,
   }) async {
     final uri = Uri.parse(
-      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
     );
 
     const templateName = "laundry_invoice_v1";
@@ -950,7 +972,7 @@ Date: $date
     final response = await http.post(
       uri,
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        'Authorization': 'Bearer ${AppConstants.accessToken}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode(body),
@@ -964,6 +986,7 @@ Date: $date
         'message': 'Laundry Bill Template sent successfully',
         'direction': 'outbound',
         'raw_payload': body,
+        'store_id': AppConstants.storeId,
       });
     } else {
       throw Exception('Template send failed: ${response.body}');

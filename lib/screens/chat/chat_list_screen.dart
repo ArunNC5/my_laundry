@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/constants.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -28,7 +29,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final response = await supabase
         .from('messages')
         .select('customer_phone, message, created_at, is_read, direction')
+        .eq('store_id', AppConstants.storeId)
         .order('created_at', ascending: false);
+
 
     final data = List<Map<String, dynamic>>.from(response);
 
@@ -56,7 +59,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _subscribeToRealtime() {
-    _channel = supabase.channel('messages_channel');
+    _channel = supabase.channel('messages_${AppConstants.storeId}');
 
     _channel.onPostgresChanges(
       event: PostgresChangeEvent.insert,
@@ -84,6 +87,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   void _handleRealtime(Map<String, dynamic>? newMsg) {
     if (newMsg == null) return;
+    if (newMsg['store_id'] != AppConstants.storeId) return;
     final phone = newMsg['customer_phone'] as String;
 
     setState(() {
@@ -102,6 +106,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   void _handleDeleteRealtime(Map<String, dynamic>? oldMsg) {
     if (oldMsg == null) return;
+
+    // ❗ Ignore messages belonging to other stores
+    if (oldMsg['store_id'] != AppConstants.storeId) return;
+
     final phone = oldMsg['customer_phone'] as String?;
     if (phone == null) return;
 
@@ -122,7 +130,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         .from('messages')
         .update({'is_read': true})
         .eq('customer_phone', phone)
-        .eq('direction', 'inbound');
+        .eq('direction', 'inbound')
+        .eq('store_id', AppConstants.storeId);
 
     setState(() {
       _unreadCount[phone] = 0;

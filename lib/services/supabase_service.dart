@@ -1,29 +1,38 @@
+import 'package:my_laundry/core/constants.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   final supabase = Supabase.instance.client;
 
-  // 🔹 Fetch all orders
+  // Temporary storeId until JWT metadata is added
+  String get storeId => AppConstants.storeId;
+
+  // ---------------------------------------------------
+  // ORDERS
+  // ---------------------------------------------------
+
   Future<List<Map<String, dynamic>>> fetchOrders() async {
     final response = await supabase
         .from('orders')
         .select()
+        .eq('store_id', storeId)
         .order('created_at', ascending: false);
+
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // 🔹 Fetch a single order by ID
   Future<Map<String, dynamic>?> fetchOrderById(String id) async {
     final response = await supabase
         .from('orders')
         .select()
         .eq('id', id)
+        .eq('store_id', storeId)
         .maybeSingle();
+
     return response;
   }
 
-  // 🔹 Insert a new order and return its ID
-  Future<String> insertOrder({ // Changed return type to int as id is typically int in Supabase
+  Future<String> insertOrder({
     required String customerName,
     required String customerPhone,
     required String customerAddress,
@@ -37,6 +46,7 @@ class SupabaseService {
     final response = await supabase
         .from('orders')
         .insert({
+      'store_id': storeId,
       'customer_name': customerName,
       'customer_phone': customerPhone,
       'customer_address': customerAddress,
@@ -51,21 +61,20 @@ class SupabaseService {
         .select('id')
         .single();
 
-    return response['id']; // Assuming id is returned as int
+    return response['id'];
   }
 
-  // 🔹 NEW: Update an existing order's main details
   Future<void> updateOrder({
-    required String orderId, // Assuming orderId is int
+    required String orderId,
     required String customerName,
     required String customerPhone,
     required String customerAddress,
     required int totalPrice,
     required String status,
-    DateTime? pickupTime, // Allow updating these too
+    DateTime? pickupTime,
     DateTime? deliveryDueTime,
   }) async {
-    final Map<String, dynamic> updateData = {
+    final updateData = {
       'customer_name': customerName,
       'customer_phone': customerPhone,
       'customer_address': customerAddress,
@@ -76,36 +85,47 @@ class SupabaseService {
         'delivery_due_time': deliveryDueTime.toIso8601String(),
     };
 
-    await supabase.from('orders').update(updateData).eq('id', orderId);
+    await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId)
+        .eq('store_id', storeId);
   }
 
-  // 🔹 Update order status and timestamps (kept for specific status updates if needed elsewhere)
   Future<void> updateOrderStatus({
-    required String orderId, // Still using String if your DB ID is UUID
+    required String orderId,
     required String status,
     DateTime? pickupTime,
     DateTime? deliveryDueTime,
   }) async {
-    final Map<String, dynamic> updateData = {
+    final updateData = {
       'status': status,
       if (pickupTime != null) 'pickup_time': pickupTime.toIso8601String(),
       if (deliveryDueTime != null)
         'delivery_due_time': deliveryDueTime.toIso8601String(),
     };
 
-    await supabase.from('orders').update(updateData).eq('id', orderId);
+    await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId)
+        .eq('store_id', storeId);
   }
 
-  // 🔹 Insert an order item
+  // ---------------------------------------------------
+  // ORDER ITEMS
+  // ---------------------------------------------------
+
   Future<void> insertOrderItem({
     required String orderId,
     required String itemType,
     required int itemPrice,
     required int quantity,
     String? notes,
-    String? category, // Added category to item to match PickupScreen
+    String? category,
   }) async {
     await supabase.from('order_items').insert({
+      'store_id': storeId,
       'order_id': orderId,
       'item_type': itemType,
       'item_price': itemPrice,
@@ -115,44 +135,55 @@ class SupabaseService {
     });
   }
 
-  // 🔹 Fetch all items for an order
   Future<List<Map<String, dynamic>>> fetchOrderItems(String orderId) async {
     final response = await supabase
         .from('order_items')
         .select()
-        .eq('order_id', orderId);
+        .eq('order_id', orderId)
+        .eq('store_id', storeId);
+
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // 🔹 NEW: Delete all items for a specific order
-  Future<void> deleteOrderItems(String orderId) async { // Assuming orderId is int
-    await supabase.from('order_items').delete().eq('order_id', orderId);
+  Future<void> deleteOrderItems(String orderId) async {
+    await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId)
+        .eq('store_id', storeId);
   }
 
-  // 🔹 Insert a status update record
+  // ---------------------------------------------------
+  // STATUS UPDATES
+  // ---------------------------------------------------
+
   Future<void> insertStatusUpdate({
-    required String orderId, // Assuming orderId is int
+    required String orderId,
     required String newStatus,
     String updatedBy = 'system',
     String? userId,
   }) async {
     await supabase.from('status_updates').insert({
+      'store_id': storeId,
       'order_id': orderId,
       'new_status': newStatus,
       'updated_by': updatedBy,
       'user_id': userId,
-      // updated_at is auto-handled in DB
     });
   }
 
-  // 🔹 Insert a payment
+  // ---------------------------------------------------
+  // PAYMENTS
+  // ---------------------------------------------------
+
   Future<void> insertPayment({
-    required String orderId, // Assuming orderId is int
+    required String orderId,
     required double amount,
     String method = 'upi',
     String? userId,
   }) async {
     await supabase.from('payments').insert({
+      'store_id': storeId,
       'order_id': orderId,
       'amount': amount,
       'payment_method': method,
@@ -161,21 +192,27 @@ class SupabaseService {
     });
   }
 
-  // 🔹 Fetch all payments for an order
   Future<List<Map<String, dynamic>>> fetchPayments(String orderId) async {
     final response = await supabase
         .from('payments')
         .select()
-        .eq('order_id', orderId);
+        .eq('order_id', orderId)
+        .eq('store_id', storeId);
+
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // 🔹 Fetch most recent customer details by phone
-  Future<Map<String, dynamic>?> fetchLatestCustomerByPhone(String phone) async {
+  // ---------------------------------------------------
+  // CUSTOMER LOOKUP
+  // ---------------------------------------------------
+
+  Future<Map<String, dynamic>?> fetchLatestCustomerByPhone(
+      String phone) async {
     final response = await supabase
         .from('orders')
         .select('customer_name, customer_address')
         .eq('customer_phone', phone)
+        .eq('store_id', storeId)
         .order('created_at', ascending: false)
         .limit(1)
         .maybeSingle();
@@ -183,26 +220,31 @@ class SupabaseService {
     return response;
   }
 
-  // 🔹 Fetch all services
+  // ---------------------------------------------------
+  // SERVICES
+  // ---------------------------------------------------
+
   Future<List<Map<String, dynamic>>> fetchAllServices() async {
-    final response = await supabase.from('services').select();
+    final response = await supabase
+        .from('services')
+        .select()
+        .eq('store_id', storeId);
+
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // 🔹 Fetch services by category
   Future<List<Map<String, dynamic>>> fetchServicesByCategory(
-      String category,
-      ) async {
+      String category) async {
     final response = await supabase
         .from('services')
         .select()
         .eq('category', category)
+        .eq('store_id', storeId)
         .order('name', ascending: true);
 
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // 🔹 Insert a new service (admin use only)
   Future<void> insertService({
     required String name,
     required int price,
@@ -210,6 +252,7 @@ class SupabaseService {
     String? iconUrl,
   }) async {
     await supabase.from('services').insert({
+      'store_id': storeId,
       'name': name,
       'price': price,
       'category': category,
@@ -231,21 +274,33 @@ class SupabaseService {
       if (iconUrl != null) 'icon_url': iconUrl,
     };
 
-    await supabase.from('services').update(updateData).eq('id', id);
+    await supabase
+        .from('services')
+        .update(updateData)
+        .eq('id', id)
+        .eq('store_id', storeId);
   }
 
   Future<void> deleteService(String id) async {
-    await supabase.from('services').delete().eq('id', id);
+    await supabase
+        .from('services')
+        .delete()
+        .eq('id', id)
+        .eq('store_id', storeId);
   }
 
-  // 🔹 Fetch UPI Details
+  // ---------------------------------------------------
+  // UPI DETAILS
+  // ---------------------------------------------------
+
   Future<Map<String, dynamic>?> fetchUPIDetails() async {
     final response = await supabase
         .from('upi_details')
         .select()
+        .eq('store_id', storeId)
         .order('created_at', ascending: false)
         .limit(1)
-        .single();
+        .maybeSingle();
 
     return response;
   }
@@ -260,6 +315,7 @@ class SupabaseService {
         .from('upi_details')
         .select('pin')
         .eq('id', id)
+        .eq('store_id', storeId)
         .single();
 
     if (existing == null || existing['pin'] != enteredPin) {
@@ -269,7 +325,8 @@ class SupabaseService {
     await supabase
         .from('upi_details')
         .update({'upi_id': upiId, 'upi_name': upiName})
-        .eq('id', id);
+        .eq('id', id)
+        .eq('store_id', storeId);
 
     return true;
   }
@@ -280,6 +337,7 @@ class SupabaseService {
     required String pin,
   }) async {
     await supabase.from('upi_details').insert({
+      'store_id': storeId,
       'upi_id': upiId,
       'upi_name': upiName,
       'pin': pin,

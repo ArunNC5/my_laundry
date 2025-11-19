@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_laundry/main_navigation_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
 import '../home/home_screen.dart';
 import '../home/order_detail.dart';
@@ -324,13 +325,13 @@ class _PickupScreenState extends State<PickupScreen> {
     String message,
   ) async {
     final uri = Uri.parse(
-      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
     );
 
     final response = await http.post(
       uri,
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        'Authorization': 'Bearer ${AppConstants.accessToken}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -361,7 +362,7 @@ class _PickupScreenState extends State<PickupScreen> {
     List<String> parameters,
   ) async {
     final uri = Uri.parse(
-      'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+      'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
     );
 
     // Build components (body with parameters)
@@ -377,7 +378,7 @@ class _PickupScreenState extends State<PickupScreen> {
     final response = await http.post(
       uri,
       headers: {
-        'Authorization': 'Bearer $accessToken',
+        'Authorization': 'Bearer ${AppConstants.accessToken}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({

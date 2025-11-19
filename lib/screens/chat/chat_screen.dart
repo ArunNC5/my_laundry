@@ -14,7 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:video_player/video_player.dart';
 
-import '../home/order_detail.dart';
+import '../../core/constants.dart';
 
 class ChatScreen extends StatefulWidget {
   final String phone;
@@ -53,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
         .from('messages')
         .select('*')
         .eq('customer_phone', widget.phone)
+        .eq('store_id', AppConstants.storeId)
         .order('created_at', ascending: true);
 
     setState(() {
@@ -64,7 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _subscribeToMessages() {
-    _channel = supabase.channel('messages_channel');
+    _channel = supabase.channel('messages_${AppConstants.storeId}');
 
     _channel.onPostgresChanges(
       event: PostgresChangeEvent.insert,
@@ -72,7 +73,9 @@ class _ChatScreenState extends State<ChatScreen> {
       table: 'messages',
       callback: (payload) async {
         final newMsg = payload.newRecord;
-        if (newMsg != null && newMsg['customer_phone'] == widget.phone) {
+        if (newMsg != null &&
+            newMsg['customer_phone'] == widget.phone &&
+            newMsg['store_id'] == AppConstants.storeId) {
           setState(() {
             messages.add(newMsg);
           });
@@ -107,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final uri = Uri.parse(
-        'https://graph.facebook.com/v22.0/$phoneNumberId/messages',
+        'https://graph.facebook.com/v22.0/${AppConstants.phoneNumberId}/messages',
       );
 
       Map<String, dynamic> body;
@@ -161,7 +164,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final response = await http.post(
         uri,
         headers: {
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer ${AppConstants.accessToken}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode(body),
@@ -181,6 +184,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'direction': 'outbound',
           'raw_payload': body,
           'is_read': true,
+          'store_id': AppConstants.storeId,
         };
 
         await supabase.from('messages').insert(newMsg);
