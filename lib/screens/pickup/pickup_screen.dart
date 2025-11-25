@@ -8,8 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
-import '../home/home_screen.dart';
-import '../home/order_detail.dart';
 
 class PickupScreen extends StatefulWidget {
   final Map<String, dynamic>? order; // Make order nullable for new pickups
@@ -38,18 +36,28 @@ class _PickupScreenState extends State<PickupScreen> {
 
   List<Map<String, dynamic>> itemTypes = [];
 
-  List<Map<String, dynamic>> get ironingItems =>
-      itemTypes.where((item) => item['category'] == 'Ironing').toList();
-
-  List<Map<String, dynamic>> get washingItems =>
-      itemTypes.where((item) => item['category'] == 'Washing').toList();
-
   @override
   void initState() {
     super.initState();
     _initializeFields(); // NEW: Method to handle prefilling existing orders
     phoneController.addListener(_onPhoneChanged);
     loadServices();
+  }
+
+  Map<String, List<Map<String, dynamic>>> get groupedCategories {
+    final Map<String, List<Map<String, dynamic>>> map = {};
+
+    for (final item in itemTypes) {
+      final category = item['category'] ?? 'Others';
+
+      if (!map.containsKey(category)) {
+        map[category] = [];
+      }
+
+      map[category]!.add(item);
+    }
+
+    return map;
   }
 
   // NEW: Method to pre-fill fields if an existing order is passed
@@ -225,6 +233,7 @@ class _PickupScreenState extends State<PickupScreen> {
             itemType: item['name'],
             quantity: item['quantity'],
             itemPrice: item['price'],
+            category  : item['category'],
           );
         }
 
@@ -251,6 +260,7 @@ class _PickupScreenState extends State<PickupScreen> {
             itemType: item['name'],
             quantity: item['quantity'],
             itemPrice: item['price'],
+            category  : item['category'],
           );
         }
 
@@ -261,31 +271,56 @@ class _PickupScreenState extends State<PickupScreen> {
         );
       }
 
-      // ✅ WhatsApp message sending (shared for both flows)
-      StringBuffer itemListBuffer = StringBuffer();
-      for (var item in clothes) {
-        itemListBuffer.writeln("• ${item['name']} × ${item['quantity']}");
+      // Group items by category
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+      for (final item in clothes) {
+        final cat = (item['category'] ?? "Others").toString().trim();
+        grouped.putIfAbsent(cat, () => []);
+        grouped[cat]!.add(item);
       }
 
-      String itemList = clothes
-          .map((item) => "${item['name']} × ${item['quantity']}")
-          .join(", ");
+      List<String> categorySegments = [];
+      int grandTotal = 0;
 
-//       String message =
-//           """
-// 🧺 *Laundry Pickup Confirmed!*
-//
-// Hello ${nameController.text.trim()},
-// We have picked up your laundry items:
-//
-// ${itemListBuffer.toString().trim()}
-//
-// 📅 Estimated delivery: within 36 hours.
-//
-// Thank you for choosing our service!
-//
-// --- Ayaning Kadai
-// """;
+      grouped.forEach((category, items) {
+        List<String> parts = [];
+
+        for (var item in items) {
+          final int qty = (item['quantity'] is int)
+              ? item['quantity']
+              : (item['quantity'] as num?)?.toInt() ?? 0;
+
+          grandTotal += qty;
+
+          parts.add("${item['name']}×$qty");
+        }
+
+        // Ironing: Shirt×2, Pant×1
+        final segment = "$category: ${parts.join(", ")}";
+        categorySegments.add(segment);
+      });
+
+// Example full summary:
+// Ironing: Shirt×2, Pant×1 | Washing: Towel×3 | Total Clothes: 6
+      String itemList = "${categorySegments.join(" | ")} | Total Clothes: $grandTotal";
+
+
+      //       String message =
+      //           """
+      // 🧺 *Laundry Pickup Confirmed!*
+      //
+      // Hello ${nameController.text.trim()},
+      // We have picked up your laundry items:
+      //
+      // ${itemListBuffer.toString().trim()}
+      //
+      // 📅 Estimated delivery: within 36 hours.
+      //
+      // Thank you for choosing our service!
+      //
+      // --- Ayaning Kadai
+      // """;
 
       await sendTemplateMessageToWhatsApp(
         "91${phoneController.text.trim()}",
@@ -308,7 +343,9 @@ class _PickupScreenState extends State<PickupScreen> {
 
       // Navigate to Home
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => MainNavigationScreen(initialIndex: 2)),
+        MaterialPageRoute(
+          builder: (context) => MainNavigationScreen(initialIndex: 2),
+        ),
         (Route<dynamic> route) => false,
       );
     } catch (e) {
@@ -788,20 +825,26 @@ class _PickupScreenState extends State<PickupScreen> {
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Ironing Services',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              buildItemGrid(ironingItems),
-              const SizedBox(height: 10),
-              const Text(
-                'Washing Services',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              buildItemGrid(washingItems),
-              const SizedBox(height: 20),
+              ...groupedCategories.entries.map((entry) {
+                final categoryName = entry.key;
+                final items = entry.value;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    Text(
+                      categoryName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    buildItemGrid(items),
+                  ],
+                );
+              }).toList(),
 
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),

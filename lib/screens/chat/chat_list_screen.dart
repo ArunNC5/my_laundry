@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
@@ -16,13 +20,62 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
   List<Map<String, dynamic>> chats = [];
   Map<String, int> _unreadCount = {};
+  Map<String, String> _contactNames = {}; // normalized phone -> name
   late RealtimeChannel _channel;
 
   @override
   void initState() {
     super.initState();
-    _loadChats();
-    _subscribeToRealtime();
+    Future(() async {
+      await _loadContacts(); // wait for contact sync first
+      await _loadChats(); // now load chats with mapped names
+      _subscribeToRealtime();
+    });
+  }
+
+  // 🔥 Normalizes phone formats
+  String normalize(String phone) {
+    phone = phone.replaceAll(RegExp(r'\D'), "");
+    if (phone.length == 10) return "91$phone";
+    if (phone.length == 11 && phone.startsWith("0"))
+      return "91${phone.substring(1)}";
+    if (phone.startsWith("91") && phone.length == 12) return phone;
+    return phone;
+  }
+
+  Future<void> _loadContacts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString("device_contacts");
+
+    // load cached names immediately
+    if (cached != null) {
+      _contactNames = Map<String, String>.from(jsonDecode(cached));
+    }
+
+    // if permission denied earlier – ask user to enable manually
+    final granted = await FlutterContacts.requestPermission(readonly: true);
+    if (!granted) {
+      setState(() {}); // still rebuild so cached names apply
+      return;
+    }
+
+    final contacts = await FlutterContacts.getContacts(withProperties: true);
+
+    for (final c in contacts) {
+      if (c.phones.isNotEmpty) {
+        final normalized = normalize(c.phones.first.number);
+        print(
+          "📱 CONTACT → ${c.displayName} | RAW: ${c.phones.first.number} | NORMALIZED: $normalized",
+        );
+        if (normalized.isEmpty) continue;
+        _contactNames[normalized] = c.displayName.isNotEmpty
+            ? c.displayName
+            : normalized;
+      }
+    }
+
+    await prefs.setString("device_contacts", jsonEncode(_contactNames));
+    setState(() {}); // update UI instantly
   }
 
   Future<void> _loadChats() async {
@@ -32,28 +85,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
         .eq('store_id', AppConstants.storeId)
         .order('created_at', ascending: false);
 
-
     final data = List<Map<String, dynamic>>.from(response);
-
     final Map<String, Map<String, dynamic>> latestByPhone = {};
     final Map<String, int> unreadCount = {};
 
     for (final msg in data) {
-      final phone = msg['customer_phone'] as String;
-
-      if (!latestByPhone.containsKey(phone)) {
-        latestByPhone[phone] = msg;
+      final normalizedPhone = normalize(msg['customer_phone']);
+      print(
+        "💬 DB MSG → ${msg['customer_phone']} | NORMALIZED: $normalizedPhone",
+      );
+      if (!latestByPhone.containsKey(normalizedPhone)) {
+        latestByPhone[normalizedPhone] = msg;
       }
-
       if (msg['direction'] == 'inbound' && msg['is_read'] == false) {
-        unreadCount[phone] = (unreadCount[phone] ?? 0) + 1;
+        unreadCount[normalizedPhone] = (unreadCount[normalizedPhone] ?? 0) + 1;
       }
     }
 
     setState(() {
       chats = latestByPhone.values.toList()
-        ..sort((a, b) =>
-            (b['created_at'] as String).compareTo(a['created_at'] as String));
+        ..sort(
+          (a, b) =>
+              (b['created_at'] as String).compareTo(a['created_at'] as String),
+        );
       _unreadCount = unreadCount;
     });
   }
@@ -85,37 +139,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _channel.subscribe();
   }
 
-  void _handleRealtime(Map<String, dynamic>? newMsg) {
+  void _handleRealtime(Map<String, dynamic>? newMsg) async {
     if (newMsg == null) return;
     if (newMsg['store_id'] != AppConstants.storeId) return;
-    final phone = newMsg['customer_phone'] as String;
+
+    final normalizedPhone = normalize(newMsg['customer_phone']);
 
     setState(() {
-      chats.removeWhere((chat) => chat['customer_phone'] == phone);
+      chats.removeWhere(
+        (chat) => normalize(chat['customer_phone']) == normalizedPhone,
+      );
       chats.insert(0, newMsg);
-      chats.sort((a, b) =>
-          (b['created_at'] as String).compareTo(a['created_at'] as String));
 
       if (newMsg['direction'] == 'inbound' && newMsg['is_read'] == false) {
-        _unreadCount[phone] = (_unreadCount[phone] ?? 0) + 1;
+        _unreadCount[normalizedPhone] =
+            (_unreadCount[normalizedPhone] ?? 0) + 1;
       } else if (newMsg['is_read'] == true) {
-        _unreadCount[phone] = 0;
+        _unreadCount[normalizedPhone] = 0;
       }
     });
   }
 
   void _handleDeleteRealtime(Map<String, dynamic>? oldMsg) {
     if (oldMsg == null) return;
-
-    // ❗ Ignore messages belonging to other stores
     if (oldMsg['store_id'] != AppConstants.storeId) return;
 
-    final phone = oldMsg['customer_phone'] as String?;
-    if (phone == null) return;
-
+    final normalizedPhone = normalize(oldMsg['customer_phone']);
     setState(() {
-      chats.removeWhere((chat) => chat['customer_phone'] == phone);
-      _unreadCount.remove(phone);
+      chats.removeWhere(
+        (chat) => normalize(chat['customer_phone']) == normalizedPhone,
+      );
+      _unreadCount.remove(normalizedPhone);
     });
   }
 
@@ -125,30 +179,38 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.dispose();
   }
 
-  void _openChat(String phone) async {
+  Future<void> _openChat(String rawPhone) async {
+    final normalizedPhone = normalize(rawPhone);
+
+    // mark read for both possible DB versions
     await supabase
         .from('messages')
         .update({'is_read': true})
-        .eq('customer_phone', phone)
+        .eq('store_id', AppConstants.storeId)
         .eq('direction', 'inbound')
-        .eq('store_id', AppConstants.storeId);
+        .filter('customer_phone', 'in', [rawPhone, normalizedPhone]);
 
-    setState(() {
-      _unreadCount[phone] = 0;
-    });
+    setState(() => _unreadCount[normalizedPhone] = 0);
+
+    final name = _contactNames[rawPhone] ?? rawPhone;
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ChatScreen(phone: phone)),
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          phone: rawPhone,
+          displayName: name, // << NEW
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5), // WhatsApp BG
+      backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF075E54), // WhatsApp Green
+        backgroundColor: const Color(0xFF075E54),
         elevation: 0,
         title: const Text(
           'WhatsApp Chats',
@@ -159,149 +221,154 @@ class _ChatListScreenState extends State<ChatListScreen> {
             letterSpacing: 0.3,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _loadContacts();
+              await _loadChats();
+            },
+          ),
+        ],
       ),
       body: chats.isEmpty
           ? const Center(
-        child: Text(
-          'No chats yet',
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
-      )
+              child: Text(
+                'No chats yet',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            )
           : ListView.builder(
-        padding: EdgeInsets.zero,
-        itemCount: chats.length,
-        itemBuilder: (context, index) {
-          final chat = chats[index];
-          final phone = chat['customer_phone'];
-          final message = chat['message'] ?? '';
-          final createdAtUtc =
-          DateTime.tryParse(chat['created_at'] ?? '');
-          final createdAtLocal = createdAtUtc?.toLocal();
-          final formattedTime = createdAtLocal != null
-              ? DateFormat('hh:mm a').format(createdAtLocal)
-              : '';
+              padding: EdgeInsets.zero,
+              itemCount: chats.length,
+              itemBuilder: (context, index) {
+                final chat = chats[index];
+                final rawPhone = chat['customer_phone'];
+                final phone = normalize(rawPhone);
+                final name = _contactNames[phone] ?? phone;
+                final message = chat['message'] ?? '';
 
-          final bool hasUnread =
-              _unreadCount[phone] != null && _unreadCount[phone]! > 0;
+                final createdAtUtc = DateTime.tryParse(
+                  chat['created_at'] ?? '',
+                );
+                final createdAtLocal = createdAtUtc?.toLocal();
+                final formattedTime = createdAtLocal != null
+                    ? DateFormat('hh:mm a').format(createdAtLocal)
+                    : '';
 
-          return InkWell(
-            onTap: () => _openChat(phone),
-            child: Container(
-              color: Colors.white,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(
+                final hasUnread =
+                    _unreadCount[phone] != null && _unreadCount[phone]! > 0;
+
+                return InkWell(
+                  onTap: () => _openChat(rawPhone),
+                  child: Container(
+                    color: Colors.white,
+                    child: Column(
                       children: [
-                        // 🟢 Avatar
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: const Color(0xFF25D366),
-                          child: Text(
-                            (phone != null && phone.length >= 2)
-                                ? phone.substring(phone.length - 2)
-                                : (phone ?? '?'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-
-                        // 💬 Chat preview
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              // Phone (or name)
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      phone,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 16,
-                                      ),
-                                    ),
+                              CircleAvatar(
+                                radius: 26,
+                                backgroundColor: const Color(0xFF25D366),
+                                child: Text(
+                                  name.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  Text(
-                                    formattedTime,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: hasUnread
-                                          ? const Color(0xFF25D366)
-                                          : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                              const SizedBox(height: 5),
-
-                              // Last message + unread badge
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      message,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: hasUnread
-                                            ? Colors.black
-                                            : Colors.grey.shade700,
-                                        fontWeight: hasUnread
-                                            ? FontWeight.w500
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                  if (hasUnread)
-                                    Container(
-                                      margin:
-                                      const EdgeInsets.only(left: 6),
-                                      width: 20,
-                                      height: 20,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF25D366),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        _unreadCount[phone]!.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        Text(
+                                          formattedTime,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: hasUnread
+                                                ? const Color(0xFF25D366)
+                                                : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                ],
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            message,
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: hasUnread
+                                                  ? Colors.black
+                                                  : Colors.grey.shade700,
+                                              fontWeight: hasUnread
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                        if (hasUnread)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              left: 6,
+                                            ),
+                                            width: 20,
+                                            height: 20,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF25D366),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                _unreadCount[phone]!.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
+                        const Divider(height: 1, thickness: 0.5, indent: 70),
                       ],
                     ),
                   ),
-                  const Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    indent: 70,
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

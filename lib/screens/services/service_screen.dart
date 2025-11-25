@@ -19,7 +19,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
   final categoryController = TextEditingController();
-  final iconUrlController = TextEditingController();
 
   @override
   void initState() {
@@ -33,7 +32,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
     nameController.dispose();
     priceController.dispose();
     categoryController.dispose();
-    iconUrlController.dispose();
     super.dispose();
   }
 
@@ -43,40 +41,32 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   void clearForm() {
+    editingId = null;
     nameController.clear();
     priceController.clear();
     categoryController.clear();
-    iconUrlController.clear();
-    editingId = null;
     setState(() {});
   }
 
   void populateForm(Map<String, dynamic> service) {
     editingId = service['id'];
-    nameController.text = service['name'] ?? '';
+    nameController.text = service['name'];
     priceController.text = service['price'].toString();
-    categoryController.text = service['category'] ?? '';
-    iconUrlController.text = service['icon_url'] ?? '';
+    categoryController.text = service['category'];
     setState(() {});
 
-    // Scroll to top where the form is located
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut);
     });
   }
 
   Future<void> handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       final name = nameController.text.trim();
-      final price = int.tryParse(priceController.text.trim()) ?? 0;
+      final price = int.parse(priceController.text.trim());
       final category = categoryController.text.trim();
-      final iconUrl = iconUrlController.text.trim().isEmpty
-          ? null
-          : iconUrlController.text.trim();
 
       if (editingId != null) {
         await supabaseService.updateService(
@@ -84,14 +74,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
           name: name,
           price: price,
           category: category,
-          iconUrl: iconUrl,
         );
       } else {
         await supabaseService.insertService(
           name: name,
           price: price,
           category: category,
-          iconUrl: iconUrl,
         );
       }
 
@@ -100,91 +88,97 @@ class _ServicesScreenState extends State<ServicesScreen> {
     }
   }
 
-  Future<void> handleDelete(String id) async {
-    await supabaseService.deleteService(id);
-    fetchServices();
+  Widget _serviceTile(Map<String, dynamic> service) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        title: Text(service['name']),
+        subtitle: Text("₹${service['price']}"),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () => populateForm(service),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 Grouping by category happens here
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final s in services) {
+      final category = s['category'] ?? 'Others';
+      grouped.putIfAbsent(category, () => []);
+      grouped[category]!.add(s);
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Manage Services',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 22,
-            color: Colors.white,
+        appBar: AppBar(
+          title: const Text(
+            'Manage Services',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 22,
+              color: Colors.white,
+            ),
           ),
-        ),
-        elevation: 0,
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
           ),
         ),
-      ),
       body: SingleChildScrollView(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // 🔹 Form section (unchanged)
             Form(
               key: _formKey,
               child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 4,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       TextFormField(
                         controller: nameController,
-                        decoration: const InputDecoration(labelText: 'Service Name'),
-                        validator: (value) => value!.isEmpty ? 'Enter name' : null,
+                        decoration: const InputDecoration(labelText: "Service Name"),
+                        validator: (v) => v!.isEmpty ? "Enter name" : null,
                       ),
                       TextFormField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Price'),
-                        validator: (value) =>
-                        value!.isEmpty ? 'Enter price' : null,
+                        decoration: const InputDecoration(labelText: "Price"),
+                        validator: (v) => v!.isEmpty ? "Enter price" : null,
                       ),
                       TextFormField(
                         controller: categoryController,
-                        decoration: const InputDecoration(labelText: 'Category'),
-                        validator: (value) =>
-                        value!.isEmpty ? 'Enter category' : null,
+                        decoration: const InputDecoration(labelText: "Category"),
+                        validator: (v) => v!.isEmpty ? "Enter category" : null,
                       ),
-                      // TextFormField(
-                      //   controller: iconUrlController,
-                      //   decoration:
-                      //   const InputDecoration(labelText: 'Icon URL (optional)'),
-                      // ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              icon: Icon(editingId != null ? Icons.save : Icons.add),
+                            child: ElevatedButton(
                               onPressed: handleSubmit,
-                              label: Text(editingId != null ? 'Update Service' : 'Add Service'),
+                              child: Text(editingId == null ? "Add Service" : "Update Service"),
                             ),
                           ),
-                          if (editingId != null) ...[
-                            const SizedBox(width: 10),
+                          if (editingId != null)
                             IconButton(
                               icon: const Icon(Icons.close, color: Colors.red),
                               onPressed: clearForm,
-                              tooltip: 'Cancel editing',
-                            )
-                          ]
+                            ),
                         ],
                       ),
                     ],
@@ -192,39 +186,32 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
               ),
             ),
+
             const SizedBox(height: 24),
             const Divider(),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: services.length,
-              itemBuilder: (context, index) {
-                final service = services[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    // leading: service['icon_url'] != null
-                    //     ? Image.network(service['icon_url'], width: 40, height: 40)
-                    //     : const Icon(Icons.local_laundry_service),
-                    title: Text(service['name']),
-                    subtitle: Text('₹${service['price']} • ${service['category']}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => populateForm(service),
-                        ),
-                        // IconButton(
-                        //   icon: const Icon(Icons.delete, color: Colors.red),
-                        //   onPressed: () => handleDelete(service['id']),
-                        // ),
-                      ],
+
+            // 🔥 Category-wise grouped list UI
+            ...grouped.entries.map((entry) {
+              final category = entry.key;
+              final items = entry.value;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(
+                    category,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2575FC),
                     ),
                   ),
-                );
-              },
-            ),
+                  const SizedBox(height: 6),
+                  ...items.map((service) => _serviceTile(service)),
+                ],
+              );
+            }).toList(),
           ],
         ),
       ),

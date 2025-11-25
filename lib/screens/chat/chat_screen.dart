@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +13,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:video_player/video_player.dart';
 
@@ -18,8 +21,9 @@ import '../../core/constants.dart';
 
 class ChatScreen extends StatefulWidget {
   final String phone;
+  final String displayName; // NEW
 
-  const ChatScreen({super.key, required this.phone});
+  const ChatScreen({super.key, required this.phone, required this.displayName});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -557,7 +561,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ------------------- Text Bubble -------------------
   Widget _buildTextBubble(Map msg, bool isMe) {
-    final text = msg['message'] ?? '';
+    final rawText = msg['message'] ?? '';
     final createdAt = DateTime.tryParse(msg['created_at'] ?? '');
     final formattedTime = createdAt != null
         ? DateFormat('hh:mm a').format(createdAt.toLocal())
@@ -575,7 +579,7 @@ class _ChatScreenState extends State<ChatScreen> {
           left: isMe ? 40 : 8,
           right: isMe ? 8 : 40,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isMe ? const Color(0xFFE1FFC7) : Colors.white,
           borderRadius: BorderRadius.only(
@@ -592,28 +596,39 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Text content
-            Flexible(
-              child: Text(
-                text,
-                style: const TextStyle(fontSize: 15, color: Colors.black87),
-              ),
-            ),
+            // 👉 Markdown + Linkify together
+            _buildRichMessage(rawText),
 
-            // Spacer between text and timestamp
-            const SizedBox(width: 8),
+            const SizedBox(height: 4),
 
-            // Time (and optional ticks later)
             Text(
               formattedTime,
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRichMessage(String rawText) {
+    return MarkdownBody(
+      data: rawText,
+      selectable: false,
+      onTapLink: (text, href, title) async {
+        if (href != null) {
+          await launchUrl(Uri.parse(href),
+              mode: LaunchMode.externalApplication);
+        }
+      },
+      styleSheet: MarkdownStyleSheet(
+        p: const TextStyle(fontSize: 15, color: Colors.black87),
+        strong: const TextStyle(fontWeight: FontWeight.bold),
+        em: const TextStyle(fontStyle: FontStyle.italic),
+        a: const TextStyle(color: Colors.blue),
       ),
     );
   }
@@ -628,48 +643,58 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(
-          top: 4,
-          bottom: 4,
-          left: isMe ? 50 : 8,
-          right: isMe ? 8 : 50,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 3,
-              offset: const Offset(1, 2),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullImageView(url: url),
             ),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                width: MediaQuery.of(context).size.width * 0.65,
-                height: MediaQuery.of(context).size.width * 0.65,
+          );
+        },
+        child: Container(
+          margin: EdgeInsets.only(
+            top: 4,
+            bottom: 4,
+            left: isMe ? 50 : 8,
+            right: isMe ? 8 : 50,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 3,
+                offset: const Offset(1, 2),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(12),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  width: MediaQuery.of(context).size.width * 0.65,
+                  height: MediaQuery.of(context).size.width * 0.65,
+                ),
               ),
-              margin: const EdgeInsets.all(6),
-              child: Text(
-                formattedTime,
-                style: const TextStyle(fontSize: 11, color: Colors.white),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.all(6),
+                child: Text(
+                  formattedTime,
+                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1129,7 +1154,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.phone,
+                    widget.displayName,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
@@ -1137,7 +1162,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   Text(
-                    "online", // optional: make dynamic later
+                    widget.phone, // optional: make dynamic later
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ],
@@ -1261,6 +1286,32 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+class FullImageView extends StatelessWidget {
+  final String url;
+
+  const FullImageView({super.key, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 3.0,
+          child: Image.network(url, fit: BoxFit.contain),
+        ),
       ),
     );
   }

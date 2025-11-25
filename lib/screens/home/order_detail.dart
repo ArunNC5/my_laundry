@@ -76,21 +76,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _loadOrderItems() async {
     final id = widget.order['id'].toString();
+
     final items = await supabaseService.fetchOrderItems(id);
+
     setState(() {
-      // Ensure item_price and quantity are parsed to numbers if they come as strings
-      orderItems = items
-          .map(
-            (item) => {
-              'item_type': item['item_type'],
-              'quantity':
-                  int.tryParse(item['quantity']?.toString() ?? '0') ?? 0,
-              'item_price':
-                  int.tryParse(item['item_price']?.toString() ?? '0') ?? 0,
-              // Add other fields as necessary
-            },
-          )
-          .toList();
+      orderItems = items.map((item) {
+        final rawQty = item['quantity'];
+        final rawPrice = item['item_price'];
+
+        return {
+          'item_type': item['item_type'],
+          'quantity': rawQty is int
+              ? rawQty
+              : (rawQty is num
+                    ? rawQty.toInt()
+                    : int.tryParse(rawQty.toString()) ?? 0),
+
+          'item_price': rawPrice is int
+              ? rawPrice
+              : (rawPrice is num
+                    ? rawPrice.toDouble()
+                    : double.tryParse(rawPrice.toString()) ?? 0),
+
+          'category': (item['category'] ?? 'Others').toString().trim(),
+          // ✅ FIXED
+        };
+      }).toList();
+
       isLoadingItems = false;
     });
   }
@@ -294,29 +306,13 @@ Thank you for choosing Ayaning Kadai! 🧺
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
+
                   if (isLoadingItems)
                     const Center(child: CircularProgressIndicator())
                   else if (orderItems.isEmpty)
                     const Text('No items found.')
                   else
-                    ...orderItems.map((item) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              item['item_type'] ?? '-',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            Text(
-                              '${item['quantity']} pcs',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                    ..._buildCategoryWiseItems(),
                 ],
               ),
             ),
@@ -641,55 +637,168 @@ Thank you for choosing Ayaning Kadai! 🧺
 
   Future<void> _sharePdfBill() async {
     setState(() => _isLoading = true);
+
     try {
-      // 1️⃣ Generate PDF
+      // ------------------------------------------------
+      // 1️⃣ Load font & create PDF document
+      // ------------------------------------------------
       final pdf = pw.Document();
       final font = pw.Font.ttf(
         await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
       );
 
-      final customer = widget.order['customer_name'];
-      final phone = widget.order['customer_phone'];
-      final address = widget.order['customer_address'];
-      final amount = _amountController.text;
+      // ------------------------------------------------
+      // 2️⃣ Extract order details
+      // ------------------------------------------------
+      final customer = widget.order['customer_name'] ?? "";
+      final phone = widget.order['customer_phone'] ?? "";
+      final address = widget.order['customer_address'] ?? "";
+
+      final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+
       final date = DateFormat('dd MMM yyyy, hh:mm a').format(
         DateTime.tryParse(widget.order['created_at'] ?? '') ?? DateTime.now(),
       );
 
+      // ------------------------------------------------
+      // 3️⃣ Group items by category (dynamic)
+      // ------------------------------------------------
+      String normalizeCategory(dynamic value) {
+        if (value == null) return "Others";
+        final raw = value.toString().trim();
+        return raw.isEmpty ? "Others" : raw;
+      }
+
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+      for (final item in orderItems) {
+        print("RAW CATEGORY → '${item['category']}'");
+
+        final category = normalizeCategory(item['category']);
+        grouped.putIfAbsent(category, () => []);
+        grouped[category]!.add(item);
+      }
+
+      // ------------------------------------------------
+      // 4️⃣ Build category widgets
+      // ------------------------------------------------
+      int grandTotalClothes = 0;
+      final List<pw.Widget> categoryWidgets = [];
+
+      grouped.forEach((categoryName, items) {
+        int categoryClothes = 0;
+        double categoryMoney = 0;
+
+        // Category Title
+        categoryWidgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 6),
+            child: pw.Text(
+              categoryName,
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                font: font,
+              ),
+            ),
+          ),
+        );
+
+        // Category Table
+        categoryWidgets.add(
+          pw.Table.fromTextArray(
+            headers: ['Item', 'Qty', 'Rate', 'Category', 'Subtotal'],
+            data: items.map((item) {
+              final itemName = item['item_type'] ?? '';
+
+              final int qty = item['quantity'] is int
+                  ? item['quantity']
+                  : (item['quantity'] as num?)?.toInt() ?? 0;
+
+              final double rate = item['item_price'] is num
+                  ? (item['item_price'] as num).toDouble()
+                  : double.tryParse(item['item_price'].toString()) ?? 0;
+
+              final double subtotal = qty * rate;
+
+              categoryClothes += qty;
+              categoryMoney += subtotal;
+              grandTotalClothes += qty;
+
+              return [
+                itemName,
+                qty.toString(),
+                rate.toStringAsFixed(2),
+                categoryName,
+                subtotal.toStringAsFixed(2),
+              ];
+            }).toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              font: font,
+            ),
+            cellStyle: pw.TextStyle(font: font),
+          ),
+        );
+
+        // Category Footer Summary
+        categoryWidgets.add(
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              "Category Total: $categoryClothes clothes • ₹${categoryMoney.toStringAsFixed(2)}",
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                font: font,
+              ),
+            ),
+          ),
+        );
+
+        categoryWidgets.add(pw.SizedBox(height: 16));
+      });
+
+      // ------------------------------------------------
+      // 5️⃣ Generate QR Code
+      // ------------------------------------------------
       final upiId = _upiIdController.text.trim();
       final upiName = _upiNameController.text.trim();
-      final upiUrl = 'upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
-      final destinationUrl =
-          'https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR';
 
-      // Generate QR Code for UPI link
-      final qrValidationResult = QrValidator.validate(
+      final upiUrl = "upi://pay?pa=$upiId&pn=$upiName&am=$amount&cu=INR";
+      final destinationUrl =
+          "https://pay.highonswift.com?pa=$upiId&pn=$upiName&am=$amount&cu=INR";
+
+      final qrValidation = QrValidator.validate(
         data: upiUrl,
         version: QrVersions.auto,
         errorCorrectionLevel: QrErrorCorrectLevel.M,
       );
-      final qrCode = qrValidationResult.qrCode;
-      final painter = QrPainter.withQr(
-        qr: qrCode!,
+
+      final qrPainter = QrPainter.withQr(
+        qr: qrValidation.qrCode!,
         color: const ui.Color(0xFF000000),
         emptyColor: const ui.Color(0xFFFFFFFF),
         gapless: true,
       );
-      final picData = await painter.toImageData(200);
-      final qrImage = pw.MemoryImage(picData!.buffer.asUint8List());
 
-      // Build PDF layout
+      final qrData = await qrPainter.toImageData(200);
+      final qrImage = pw.MemoryImage(qrData!.buffer.asUint8List());
+
+      // ------------------------------------------------
+      // 6️⃣ Build PDF Layout
+      // ------------------------------------------------
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) => pw.Padding(
+          build: (context) => pw.Padding(
             padding: const pw.EdgeInsets.all(24),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Center(
                   child: pw.Text(
-                    'Laundry Bill',
+                    "Laundry Bill",
                     style: pw.TextStyle(
                       fontSize: 26,
                       fontWeight: pw.FontWeight.bold,
@@ -698,45 +807,34 @@ Thank you for choosing Ayaning Kadai! 🧺
                   ),
                 ),
                 pw.SizedBox(height: 24),
-                pw.Text(
-                  'Customer Name: $customer',
-                  style: pw.TextStyle(font: font),
-                ),
-                pw.Text('Phone: $phone', style: pw.TextStyle(font: font)),
-                pw.Text('Address: $address', style: pw.TextStyle(font: font)),
-                pw.Text('Order Date: $date', style: pw.TextStyle(font: font)),
+
+                pw.Text("Customer Name: $customer"),
+                pw.Text("Phone: $phone"),
+                pw.Text("Address: $address"),
+                pw.Text("Order Date: $date"),
+
                 pw.SizedBox(height: 24),
-                pw.Text(
-                  'Items',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Table.fromTextArray(
-                  headers: ['Item Type', 'Qty', 'Price (₹)'],
-                  data: orderItems
-                      .map(
-                        (item) => [
-                          item['item_type'] ?? '',
-                          '${item['quantity']}',
-                          '${item['item_price'] ?? 0}',
-                        ],
-                      )
-                      .toList(),
-                  headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    font: font,
-                  ),
-                  cellStyle: pw.TextStyle(font: font),
-                ),
-                pw.SizedBox(height: 16),
+
+                ...categoryWidgets,
+
                 pw.Divider(),
+
                 pw.Align(
                   alignment: pw.Alignment.centerRight,
                   child: pw.Text(
-                    'Total Amount: ₹$amount',
+                    "Grand Total Clothes: $grandTotalClothes",
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+
+                pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    "Grand Total Amount: ₹${amount.toStringAsFixed(2)}",
                     style: pw.TextStyle(
                       fontSize: 18,
                       fontWeight: pw.FontWeight.bold,
@@ -744,31 +842,33 @@ Thank you for choosing Ayaning Kadai! 🧺
                     ),
                   ),
                 ),
+
                 pw.SizedBox(height: 24),
+
                 pw.Center(
                   child: pw.UrlLink(
                     destination: destinationUrl,
                     child: pw.Text(
-                      'Tap to Pay via UPI',
+                      "Tap to Pay via UPI",
                       style: pw.TextStyle(
                         decoration: pw.TextDecoration.underline,
                         color: PdfColors.blue,
-                        font: font,
                       ),
                     ),
                   ),
                 ),
+
                 pw.SizedBox(height: 24),
                 pw.Center(child: pw.Image(qrImage, width: 100, height: 100)),
                 pw.SizedBox(height: 24),
                 pw.Divider(),
+
                 pw.Center(
                   child: pw.Text(
-                    'Thank you for choosing Ayaning Kadai!',
+                    "Thank you for choosing Ayaning Kadai!",
                     style: pw.TextStyle(
                       fontSize: 14,
                       fontStyle: pw.FontStyle.italic,
-                      font: font,
                     ),
                   ),
                 ),
@@ -778,68 +878,32 @@ Thank you for choosing Ayaning Kadai! 🧺
         ),
       );
 
-      // Save PDF
-      final Uint8List bytes = await pdf.save();
+      // ------------------------------------------------
+      // 7️⃣ Save, upload & send via WhatsApp
+      // ------------------------------------------------
+      final bytes = await pdf.save();
       final output = await getTemporaryDirectory();
-      final file = File('${output.path}/laundry_bill.pdf');
+      final file = File("${output.path}/laundry_bill.pdf");
       await file.writeAsBytes(bytes);
+
       final pdfUrl = await uploadPdfAndGetPublicUrl(file);
 
-      // 2️⃣ Try sending via WhatsApp Template first
-      try {
-        await sendBillTemplateWithPdf(
-          phoneNumber: phone,
-          customerName: customer,
-          amount: amount,
-          date: date,
-          pdfUrl: pdfUrl,
-          payUrl: destinationUrl,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Template sent successfully via WhatsApp'),
-          ),
-        );
-      } catch (e) {
-        // ⚠️ Fallback: send plain PDF + text
-        debugPrint('Template failed: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Template failed. Sending regular PDF instead...'),
-          ),
-        );
+      await sendBillTemplateWithPdf(
+        phoneNumber: phone,
+        customerName: customer,
+        amount: amount.toStringAsFixed(2),
+        date: date,
+        pdfUrl: pdfUrl,
+        payUrl: destinationUrl,
+      );
 
-        final billMessage =
-            '''
-🧾 Laundry Bill
-
-Hi 👋, thanks for choosing us!
-
-Name: $customer  
-Amount: ₹$amount  
-Date: $date  
-
-— Ayaning Kadai
-''';
-
-        try {
-          await sendPdfToWhatsApp(phone, pdfUrl);
-          await sendTextMessageToWhatsApp(phone, billMessage);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Fallback PDF & text sent successfully'),
-            ),
-          );
-        } catch (fallbackError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('❌ Fallback also failed: $fallbackError')),
-          );
-        }
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Bill shared successfully")));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('❌ Error generating PDF: $e')));
+      ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -1004,5 +1068,62 @@ Date: $date
     }
     final publicUrl = bucket.getPublicUrl(filePath);
     return publicUrl;
+  }
+
+  List<Widget> _buildCategoryWiseItems() {
+    Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (final item in orderItems) {
+      final rawCategory = item['category']?.toString().trim();
+      final category = (rawCategory == null || rawCategory.isEmpty)
+          ? "Others"
+          : rawCategory;
+
+      grouped.putIfAbsent(category, () => []);
+      grouped[category]!.add(item);
+    }
+
+    List<Widget> widgets = [];
+
+    grouped.forEach((category, items) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 6),
+          child: Text(
+            category,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      );
+
+      for (final item in items) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  item['item_type'] ?? '-',
+                  style: const TextStyle(fontSize: 15),
+                ),
+                Text(
+                  '${item['quantity']} pcs',
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      widgets.add(const Divider(thickness: 0.5));
+    });
+
+    return widgets;
   }
 }

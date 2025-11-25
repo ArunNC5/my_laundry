@@ -54,5 +54,8 @@
 	</array>
 	<key>com.apple.developer.aps-environment</key>
 	<string>development</string>
+	<key>NSContactsUsageDescription</key>
+    <string>This app requires contacts access to show names in chat.</string>
+
 </dict>
 </plist>
