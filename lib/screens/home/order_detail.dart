@@ -771,6 +771,7 @@ Thank you for choosing Ayaning Kadai! 🧺
               style: pw.TextStyle(
                 fontSize: 18,
                 fontWeight: pw.FontWeight.bold,
+                font: font
               ),
             ),
           ),

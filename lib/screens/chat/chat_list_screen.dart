@@ -22,13 +22,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Map<String, int> _unreadCount = {};
   Map<String, String> _contactNames = {}; // normalized phone -> name
   late RealtimeChannel _channel;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     Future(() async {
-      await _loadContacts(); // wait for contact sync first
-      await _loadChats(); // now load chats with mapped names
+      await _loadContacts();
+      await _loadChats();
+      setState(() => _isLoading = false); // 🔥 loader stops here
       _subscribeToRealtime();
     });
   }
@@ -197,12 +199,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          phone: rawPhone,
-          displayName: name, // << NEW
-        ),
+        builder: (_) => ChatScreen(phone: rawPhone, displayName: name),
       ),
-    );
+    ).then((value) async {
+      // 🔥 Reload contacts after coming back from ChatScreen
+      await _loadContacts();
+      await _loadChats();
+      setState(() {});
+    });
   }
 
   @override
@@ -231,7 +235,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ],
       ),
-      body: chats.isEmpty
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF075E54)),
+            )
+          : chats.isEmpty
           ? const Center(
               child: Text(
                 'No chats yet',

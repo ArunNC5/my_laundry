@@ -1111,51 +1111,176 @@ class _ChatScreenState extends State<ChatScreen> {
     return widgets;
   }
 
+  void _showAddContactDialog({
+    required String initialName,
+    required String initialPhone,
+  }) {
+    final nameCtrl = TextEditingController(text: initialName);
+    final phoneCtrl = TextEditingController(text: initialPhone);
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                const Text(
+                  "Add to Contacts",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // Name Field
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: "Name",
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Phone Field
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: "Phone Number",
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF128C7E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _addToContacts(
+                          name: nameCtrl.text.trim(),
+                          phone: phoneCtrl.text.trim(),
+                        );
+                      },
+                      child: const Text(
+                        "Save",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+
   Future<void> _addToContacts({
     required String name,
     required String phone,
   }) async {
     try {
+      // Normalize phone
       String normalized = phone.replaceAll(RegExp(r'\D'), '');
       if (normalized.length == 10) normalized = "91$normalized";
 
+      // Permission
       final granted = await FlutterContacts.requestPermission();
       if (!granted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Contacts permission denied")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Contacts permission denied")));
         return;
       }
 
+      // Duplicate check
       final existing = await FlutterContacts.getContacts(withProperties: true);
-      final alreadyExists = existing.any((c) {
-        return c.phones.any(
-          (p) => p.number.replaceAll(RegExp(r'\D'), '') == normalized,
-        );
-      });
+      final alreadyExists = existing.any((c) =>
+          c.phones.any((p) => p.number.replaceAll(RegExp(r'\D'), '') == normalized));
 
       if (alreadyExists) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Contact already exists")));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Contact already exists")));
         return;
       }
 
+      // Build contact correctly
       final contact = Contact()
         ..name = _buildName(name)
         ..phones = [Phone(normalized)];
 
       await contact.insert();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Contact saved successfully")),
-      );
+      Navigator.pop(context, true);
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Contact saved successfully")));
+
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error saving contact: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error saving contact: $e")));
     }
   }
+
 
   Name _buildName(String fullName) {
     final parts = fullName.trim().split(' ');
@@ -1236,7 +1361,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.person_add_alt_1),
             onPressed: () {
-              _addToContacts(name: widget.displayName, phone: widget.phone);
+              _showAddContactDialog(initialName: widget.displayName,  initialPhone: widget.phone);
             },
           ),
         ],
