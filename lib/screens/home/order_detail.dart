@@ -639,129 +639,149 @@ Thank you for choosing Ayaning Kadai! 🧺
     setState(() => _isLoading = true);
 
     try {
-      // ------------------------------------------------
-      // 1️⃣ Load font & create PDF document
-      // ------------------------------------------------
       final pdf = pw.Document();
-      final font = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
-      );
+      final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
 
-      // ------------------------------------------------
-      // 2️⃣ Extract order details
-      // ------------------------------------------------
       final customer = widget.order['customer_name'] ?? "";
       final phone = widget.order['customer_phone'] ?? "";
       final address = widget.order['customer_address'] ?? "";
-
       final amount = double.tryParse(_amountController.text.trim()) ?? 0;
 
       final date = DateFormat('dd MMM yyyy, hh:mm a').format(
         DateTime.tryParse(widget.order['created_at'] ?? '') ?? DateTime.now(),
       );
 
-      // ------------------------------------------------
-      // 3️⃣ Group items by category (dynamic)
-      // ------------------------------------------------
-      String normalizeCategory(dynamic value) {
-        if (value == null) return "Others";
-        final raw = value.toString().trim();
-        return raw.isEmpty ? "Others" : raw;
+      // ----------------------------
+      // 1️⃣ Dynamic Category Grouping
+      // ----------------------------
+      String normalizeCategory(dynamic v) {
+        if (v == null) return "Others";
+        final txt = v.toString().trim();
+        return txt.isEmpty ? "Others" : txt;
       }
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
 
       for (final item in orderItems) {
-        print("RAW CATEGORY → '${item['category']}'");
-
         final category = normalizeCategory(item['category']);
         grouped.putIfAbsent(category, () => []);
         grouped[category]!.add(item);
       }
 
-      // ------------------------------------------------
-      // 4️⃣ Build category widgets
-      // ------------------------------------------------
-      int grandTotalClothes = 0;
-      final List<pw.Widget> categoryWidgets = [];
+      // ----------------------------
+      // 2️⃣ Build category widgets
+      // ----------------------------
+      List<pw.Widget> buildCategoryWidgets() {
+        List<pw.Widget> widgets = [];
+        int grandTotalClothes = 0;
 
-      grouped.forEach((categoryName, items) {
-        int categoryClothes = 0;
-        double categoryMoney = 0;
+        grouped.forEach((categoryName, items) {
+          int categoryClothes = 0;
+          double categoryMoney = 0;
 
-        // Category Title
-        categoryWidgets.add(
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 6),
-            child: pw.Text(
-              categoryName,
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                font: font,
+          widgets.add(
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
+              child: pw.Text(
+                categoryName,
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  font: font,
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        // Category Table
-        categoryWidgets.add(
-          pw.Table.fromTextArray(
-            headers: ['Item', 'Qty', 'Rate', 'Category', 'Subtotal'],
-            data: items.map((item) {
-              final itemName = item['item_type'] ?? '';
+          widgets.add(
+            pw.Table.fromTextArray(
+              headers: ['Item', 'Qty', 'Rate', 'Subtotal'],
+              data: items.map((item) {
+                final itemName = item['item_type'] ?? "";
 
-              final int qty = item['quantity'] is int
-                  ? item['quantity']
-                  : (item['quantity'] as num?)?.toInt() ?? 0;
+                final int qty = (item['quantity'] is int)
+                    ? item['quantity']
+                    : (item['quantity'] as num?)?.toInt() ?? 0;
 
-              final double rate = item['item_price'] is num
-                  ? (item['item_price'] as num).toDouble()
-                  : double.tryParse(item['item_price'].toString()) ?? 0;
+                final double rate = (item['item_price'] is num)
+                    ? (item['item_price'] as num).toDouble()
+                    : double.tryParse(item['item_price']?.toString() ?? '0') ?? 0;
 
-              final double subtotal = qty * rate;
+                final double subtotal = qty * rate;
 
-              categoryClothes += qty;
-              categoryMoney += subtotal;
-              grandTotalClothes += qty;
+                categoryClothes += qty;
+                categoryMoney += subtotal;
+                grandTotalClothes += qty;
 
-              return [
-                itemName,
-                qty.toString(),
-                rate.toStringAsFixed(2),
-                categoryName,
-                subtotal.toStringAsFixed(2),
-              ];
-            }).toList(),
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              font: font,
+                return [
+                  itemName,
+                  qty.toString(),
+                  rate.toStringAsFixed(2),
+                  subtotal.toStringAsFixed(2),
+                ];
+              }).toList(),
+              border: pw.TableBorder.all(width: 0.3),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: font),
+              cellStyle: pw.TextStyle(font: font),
             ),
-            cellStyle: pw.TextStyle(font: font),
-          ),
-        );
+          );
 
-        // Category Footer Summary
-        categoryWidgets.add(
+          widgets.add(
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                "Category Total: $categoryClothes clothes • ₹${categoryMoney.toStringAsFixed(2)}",
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  font: font,
+                ),
+              ),
+            ),
+          );
+
+          widgets.add(pw.SizedBox(height: 10));
+        });
+
+        // Append final summary
+        widgets.add(pw.Divider());
+
+        widgets.add(
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Text(
-              "Category Total: $categoryClothes clothes • ₹${categoryMoney.toStringAsFixed(2)}",
+              "Grand Total Clothes: ${grouped.values.expand((e) => e).fold<int>(0, (sum, item) {
+                final q = item['quantity'];
+                return sum + ((q is int) ? q : (q as num?)?.toInt() ?? 0);
+              })}",
               style: pw.TextStyle(
-                fontSize: 13,
+                fontSize: 16,
                 fontWeight: pw.FontWeight.bold,
-                font: font,
+                font: font
               ),
             ),
           ),
         );
 
-        categoryWidgets.add(pw.SizedBox(height: 16));
-      });
+        widgets.add(
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              "Grand Total Amount: ₹${amount.toStringAsFixed(2)}",
+              style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+        );
 
-      // ------------------------------------------------
-      // 5️⃣ Generate QR Code
-      // ------------------------------------------------
+        return widgets;
+      }
+
+      // ----------------------------
+      // 3️⃣ Build QR
+      // ----------------------------
       final upiId = _upiIdController.text.trim();
       final upiName = _upiNameController.text.trim();
 
@@ -785,105 +805,71 @@ Thank you for choosing Ayaning Kadai! 🧺
       final qrData = await qrPainter.toImageData(200);
       final qrImage = pw.MemoryImage(qrData!.buffer.asUint8List());
 
-      // ------------------------------------------------
-      // 6️⃣ Build PDF Layout
-      // ------------------------------------------------
+      // ----------------------------
+      // 4️⃣ MULTI-PAGE PDF (Fixes overflow)
+      // ----------------------------
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          build: (context) => pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Center(
-                  child: pw.Text(
-                    "Laundry Bill",
-                    style: pw.TextStyle(
-                      fontSize: 26,
-                      fontWeight: pw.FontWeight.bold,
-                      font: font,
-                    ),
-                  ),
+          margin: const pw.EdgeInsets.all(24),
+          build: (context) => [
+            pw.Center(
+              child: pw.Text(
+                "Laundry Bill",
+                style: pw.TextStyle(
+                  fontSize: 26,
+                  fontWeight: pw.FontWeight.bold,
+                  font: font,
                 ),
-                pw.SizedBox(height: 24),
-
-                pw.Text("Customer Name: $customer"),
-                pw.Text("Phone: $phone"),
-                pw.Text("Address: $address"),
-                pw.Text("Order Date: $date"),
-
-                pw.SizedBox(height: 24),
-
-                ...categoryWidgets,
-
-                pw.Divider(),
-
-                pw.Align(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Text(
-                    "Grand Total Clothes: $grandTotalClothes",
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-                pw.SizedBox(height: 16),
-
-                pw.Align(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Text(
-                    "Grand Total Amount: ₹${amount.toStringAsFixed(2)}",
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                      font: font,
-                    ),
-                  ),
-                ),
-
-                pw.SizedBox(height: 24),
-
-                pw.Center(
-                  child: pw.UrlLink(
-                    destination: destinationUrl,
-                    child: pw.Text(
-                      "Tap to Pay via UPI",
-                      style: pw.TextStyle(
-                        decoration: pw.TextDecoration.underline,
-                        color: PdfColors.blue,
-                      ),
-                    ),
-                  ),
-                ),
-
-                pw.SizedBox(height: 24),
-                pw.Center(child: pw.Image(qrImage, width: 100, height: 100)),
-                pw.SizedBox(height: 24),
-                pw.Divider(),
-
-                pw.Center(
-                  child: pw.Text(
-                    "Thank you for choosing Ayaning Kadai!",
-                    style: pw.TextStyle(
-                      fontSize: 14,
-                      fontStyle: pw.FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            pw.SizedBox(height: 20),
+
+            pw.Text("Customer Name: $customer"),
+            pw.Text("Phone: $phone"),
+            pw.Text("Address: $address"),
+            pw.Text("Order Date: $date"),
+
+            pw.SizedBox(height: 20),
+
+            ...buildCategoryWidgets(),
+
+            pw.SizedBox(height: 24),
+
+            pw.Center(
+              child: pw.UrlLink(
+                destination: destinationUrl,
+                child: pw.Text(
+                  "Tap to Pay via UPI",
+                  style: pw.TextStyle(
+                    decoration: pw.TextDecoration.underline,
+                    color: PdfColors.blue,
+                  ),
+                ),
+              ),
+            ),
+
+            pw.SizedBox(height: 20),
+            pw.Center(child: pw.Image(qrImage, width: 100, height: 100)),
+            pw.SizedBox(height: 20),
+            pw.Divider(),
+
+            pw.Center(
+              child: pw.Text(
+                "Thank you for choosing Ayaning Kadai!",
+                style: pw.TextStyle(fontSize: 14, fontStyle: pw.FontStyle.italic),
+              ),
+            ),
+          ],
         ),
       );
 
-      // ------------------------------------------------
-      // 7️⃣ Save, upload & send via WhatsApp
-      // ------------------------------------------------
+      // ----------------------------
+      // Save + Upload + Send
+      // ----------------------------
       final bytes = await pdf.save();
-      final output = await getTemporaryDirectory();
-      final file = File("${output.path}/laundry_bill.pdf");
+      final dir = await getTemporaryDirectory();
+      final file = File("${dir.path}/laundry_bill.pdf");
       await file.writeAsBytes(bytes);
 
       final pdfUrl = await uploadPdfAndGetPublicUrl(file);
@@ -897,13 +883,11 @@ Thank you for choosing Ayaning Kadai! 🧺
         payUrl: destinationUrl,
       );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Bill shared successfully")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Bill shared successfully")));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("❌ Error: $e")));
     } finally {
       setState(() => _isLoading = false);
     }

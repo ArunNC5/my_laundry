@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -620,8 +620,10 @@ class _ChatScreenState extends State<ChatScreen> {
       selectable: false,
       onTapLink: (text, href, title) async {
         if (href != null) {
-          await launchUrl(Uri.parse(href),
-              mode: LaunchMode.externalApplication);
+          await launchUrl(
+            Uri.parse(href),
+            mode: LaunchMode.externalApplication,
+          );
         }
       },
       styleSheet: MarkdownStyleSheet(
@@ -647,9 +649,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => FullImageView(url: url),
-            ),
+            MaterialPageRoute(builder: (_) => FullImageView(url: url)),
           );
         },
         child: Container(
@@ -1111,6 +1111,61 @@ class _ChatScreenState extends State<ChatScreen> {
     return widgets;
   }
 
+  Future<void> _addToContacts({
+    required String name,
+    required String phone,
+  }) async {
+    try {
+      String normalized = phone.replaceAll(RegExp(r'\D'), '');
+      if (normalized.length == 10) normalized = "91$normalized";
+
+      final granted = await FlutterContacts.requestPermission();
+      if (!granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Contacts permission denied")),
+        );
+        return;
+      }
+
+      final existing = await FlutterContacts.getContacts(withProperties: true);
+      final alreadyExists = existing.any((c) {
+        return c.phones.any(
+          (p) => p.number.replaceAll(RegExp(r'\D'), '') == normalized,
+        );
+      });
+
+      if (alreadyExists) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Contact already exists")));
+        return;
+      }
+
+      final contact = Contact()
+        ..name = _buildName(name)
+        ..phones = [Phone(normalized)];
+
+      await contact.insert();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Contact saved successfully")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error saving contact: $e")));
+    }
+  }
+
+  Name _buildName(String fullName) {
+    final parts = fullName.trim().split(' ');
+    if (parts.length == 1) {
+      return Name(first: parts[0]);
+    } else {
+      return Name(first: parts.first, last: parts.sublist(1).join(' '));
+    }
+  }
+
   @override
   void dispose() {
     _channel.unsubscribe();
@@ -1177,6 +1232,12 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.assignment_turned_in, color: Colors.white),
             onPressed: _resolveChat,
             tooltip: "Resolve Chat",
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1),
+            onPressed: () {
+              _addToContacts(name: widget.displayName, phone: widget.phone);
+            },
           ),
         ],
       ),
@@ -1290,7 +1351,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
-
 
 class FullImageView extends StatelessWidget {
   final String url;
