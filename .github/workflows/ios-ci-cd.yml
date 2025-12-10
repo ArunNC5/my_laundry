@@ -1,0 +1,53 @@
+name: Flutter iOS CI/CD with TestFlight
+
+on:
+  push:
+    branches: [ dev ]
+  #pull_request: pull_request:
+  #  branches: [ dev ]
+
+jobs:
+  ios-build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: stable
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Flutter Analyze
+        run: flutter analyze
+
+      - name: Run Flutter Tests
+        run: flutter test
+
+      - name: Install iOS dependencies (CocoaPods)
+        run: |
+          cd ios
+          pod install
+
+      - name: Install Fastlane
+        run: sudo gem install fastlane -NV
+
+      - name: Build IPA + Upload to TestFlight
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+        run: |
+          cd ios
+          fastlane beta
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: my-laundry-ios
+          path: build/ios/Runner.ipa
+
