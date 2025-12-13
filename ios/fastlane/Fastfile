@@ -5,8 +5,9 @@ platform :ios do
   lane :beta do
 
     match(
-      type: "appstore",
-      readonly: true
+        type: "appstore",
+        storage_mode: "app_store_connect",
+        readonly: true
     )
 
     gym(
