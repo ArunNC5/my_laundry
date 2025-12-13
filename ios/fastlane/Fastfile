@@ -4,12 +4,6 @@ platform :ios do
   desc "Build IPA for TestFlight"
   lane :beta do
 
-    match(
-        type: "appstore",
-        storage_mode: "app_store_connect",
-        readonly: true
-    )
-
     gym(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
