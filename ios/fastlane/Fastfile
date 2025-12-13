@@ -11,7 +11,7 @@ platform :ios do
       xcargs: "-allowProvisioningUpdates",
       export_options: {
         signingStyle: "automatic"
-      }
+      },
       output_name: "Runner.ipa"
     )
 
