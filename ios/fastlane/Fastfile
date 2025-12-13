@@ -9,6 +9,9 @@ platform :ios do
       export_method: "app-store",
       output_directory: "../build/ios",
       xcargs: "-allowProvisioningUpdates",
+      export_options: {
+        signingStyle: "automatic"
+      }
       output_name: "Runner.ipa"
     )
 
