@@ -8,6 +8,7 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: "../build/ios",
+      xcargs: "-allowProvisioningUpdates",
       output_name: "Runner.ipa"
     )
 
