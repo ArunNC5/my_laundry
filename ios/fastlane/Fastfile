@@ -7,7 +7,6 @@ platform :ios do
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
       export_method: "app-store",
-      allowProvisioningUpdates: true,
       output_directory: "../build/ios",
       output_name: "Runner.ipa"
     )
