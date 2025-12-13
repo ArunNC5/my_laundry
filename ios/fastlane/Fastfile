@@ -3,15 +3,17 @@ default_platform(:ios)
 platform :ios do
   desc "Build IPA for TestFlight"
   lane :beta do
+
+    match(
+      type: "appstore",
+      readonly: true
+    )
+
     gym(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
       export_method: "app-store",
       output_directory: "../build/ios",
-      xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        signingStyle: "automatic"
-      },
       output_name: "Runner.ipa"
     )
 
