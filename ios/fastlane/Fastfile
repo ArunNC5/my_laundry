@@ -23,10 +23,11 @@ platform :ios do
     )
 
     update_project_provisioning(
-    xcodeproj: "Runner.xcodeproj",  # <-- Verify this path to your Xcode project file
-    target_filter: "Runner",          # <-- Your main app target name
-    profile: "match AppStore com.highonswift.myLaundry", # <-- The exact profile name from match output
-    build_configuration: "Release"    # <-- Apply to the configuration used for App Store
+      xcodeproj: "Runner.xcodeproj",
+      target_filter: "Runner",
+      # Use the profile name that match installed
+      profile_name: "match AppStore com.highonswift.myLaundry", 
+      build_configuration: "Release"
     )
     # 3. BUILD: The gym step will now find the necessary profiles installed by match
     gym(
