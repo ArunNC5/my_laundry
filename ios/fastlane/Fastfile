@@ -1,9 +1,28 @@
 default_platform(:ios)
 
 platform :ios do
-  desc "Build IPA for TestFlight"
+  desc "Build and upload IPA to TestFlight with automated code signing"
   lane :beta do
 
+    # 1. Define the App Store Connect API Key (for both match and upload_to_testflight)
+    api_key = app_store_connect_api_key(
+      key_id: ENV['ASC_API_KEY_ID'],
+      issuer_id: ENV['ASC_ISSUER_ID'],
+      key_content: ENV['ASC_API_KEY'],
+      is_key_content_base64: false
+    )
+
+    # 2. CODE SIGNING: Fetch and install the App Store Certificate and Profile
+    # This step uses the MATCH_PASSWORD and the ASC_* keys from GitHub Secrets
+    # to clone the private repo, decrypt the files, and install them on the runner.
+    match(
+      type: "appstore",        # Use the App Store type profile
+      readonly: true,          # CI should only download, not modify/revoke
+      api_key: api_key         # Use the API key for communication with Apple
+    )
+
+
+    # 3. BUILD: The gym step will now find the necessary profiles installed by match
     gym(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
@@ -12,14 +31,11 @@ platform :ios do
       output_name: "Runner.ipa"
     )
 
+    # 4. UPLOAD: Send the generated IPA to TestFlight
     upload_to_testflight(
       ipa: "../build/ios/Runner.ipa",
-      api_key: app_store_connect_api_key(
-        key_id: ENV['ASC_API_KEY_ID'],
-        issuer_id: ENV['ASC_ISSUER_ID'],
-        key_content: ENV['ASC_API_KEY'],
-        is_key_content_base64: false
-      )
+      api_key: api_key
     )
+
   end
 end
