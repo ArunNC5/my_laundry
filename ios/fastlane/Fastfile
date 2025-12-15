@@ -19,6 +19,7 @@ platform :ios do
       type: "appstore",        # Use the App Store type profile
       readonly: true,          # CI should only download, not modify/revoke
       api_key: api_key         # Use the API key for communication with Apple
+      app_identifier: "com.highonswift.myLaundry"
     )
 
 
