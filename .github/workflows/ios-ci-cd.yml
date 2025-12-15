@@ -2,7 +2,7 @@ name: Flutter iOS CI/CD with TestFlight
 
 on:
   push:
-    branches: 
+    branches:
       - dev
       - development-ci-cd
 
@@ -36,15 +36,27 @@ jobs:
           pod install
 
       - name: Install Fastlane
+        # Installing globally is necessary when not using a Gemfile outside the directory
         run: sudo gem install fastlane -NV
 
+      # CRUCIAL STEP: Setup SSH Agent and inject the key for 'match'
+      # This resolves the "Permission denied (publickey)" error when cloning the private certificates repo
+      - name: Setup SSH Key for Fastlane Match
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          # Use the private key you generated specifically for the CI runner
+          ssh-private-key: ${{ secrets.MATCH_SSH_KEY }}
+          
       - name: Build IPA + Upload to TestFlight
+        # Set all necessary secrets as environment variables for Fastlane
         env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
         run: |
           cd ios
+          # Execute the Fastlane lane that includes: match, gym, and upload_to_testflight
           fastlane beta
 
       - name: Upload IPA artifact
@@ -52,4 +64,3 @@ jobs:
         with:
           name: my-laundry-ios
           path: build/ios/Runner.ipa
-
