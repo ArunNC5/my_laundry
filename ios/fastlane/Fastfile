@@ -25,8 +25,10 @@ platform :ios do
     update_project_provisioning(
       xcodeproj: "Runner.xcodeproj",
       target_filter: "Runner",
-      # Use the profile name that match installed
-      profile_name: "match AppStore com.highonswift.myLaundry", 
+      # Use the ENV variable that holds the full path to the downloaded profile
+      profile: ENV["SIGH_COM.HIGHONSWIFT.MYLAUNDRY_APPSTORE_PROFILE_PATH"],
+      # Explicitly set the code signing identity installed by match
+      code_signing_identity: "Apple Distribution",
       build_configuration: "Release"
     )
     # 3. BUILD: The gym step will now find the necessary profiles installed by match
