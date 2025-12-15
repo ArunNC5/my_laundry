@@ -22,23 +22,19 @@ platform :ios do
       app_identifier: "com.highonswift.myLaundry"
     )
 
-    update_project_provisioning(
-      xcodeproj: "Runner.xcodeproj",
-      target_filter: "Runner",
-      # Use the ENV variable that holds the full path to the downloaded profile
-      profile: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_PATH"],
-      # Explicitly set the code signing identity installed by match
-      code_signing_identity: "Apple Distribution",
-      build_configuration: "Release"
-    )
     # 3. BUILD: The gym step will now find the necessary profiles installed by match
     gym(
-      workspace: "Runner.xcworkspace",
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: "../build/ios",
-      output_name: "Runner.ipa"
-    )
+    scheme: "Runner",
+    workspace: "Runner.xcworkspace",
+    export_method: "app-store",
+    clean: true,
+    output_directory: "../build/ios",
+    output_name: "Runner.ipa",
+    provisioning_profile: {
+      "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
+    },
+    codesigning_identity: "Apple Distribution" # Using the hardcoded name is safer here
+  )
 
     # 4. UPLOAD: Send the generated IPA to TestFlight
     upload_to_testflight(
