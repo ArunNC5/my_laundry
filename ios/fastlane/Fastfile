@@ -23,11 +23,11 @@ platform :ios do
     )
 
     update_code_signing_settings(
-    xcodeproj: "Runner.xcodeproj",
-    target_filter: "Runner",
-    build_configuration: "Release", # Important: Match your build configuration
-    code_sign_identity: "",
-    )
+    path: "Runner.xcodeproj", # Use 'path' instead of 'xcodeproj'
+    targets: ["Runner"], # Use 'targets' instead of 'target_filter'
+    build_configurations: ["Release"],
+    code_sign_identity: "" 
+  )
 
     # 3. BUILD: The gym step will now find the necessary profiles installed by match
     gym(
