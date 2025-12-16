@@ -36,10 +36,12 @@ platform :ios do
     clean: false,
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
-    export_method: "app-store",
     
-    # CRITICAL NEW ADDITION: Explicitly set the team ID for export
-    export_team_id: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_TEAM_ID"],
+    # CRITICAL CHANGE 1: Use the new export method name
+    export_method: "app-store-connect",
+    
+    # CRITICAL CHANGE 2: Explicitly set the team ID for export
+    export_team_id: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_TEAM_ID"], 
     
     export_options: {
       provisioningProfiles: {
