@@ -43,6 +43,7 @@ platform :ios do
     # CRITICAL FIX A: Explicitly set the team ID via the gym parameter
     # Using the hardcoded value to eliminate ENV variable issues
     export_team_id: "7BXGN254MD", 
+    include_bitcode: false,
     
     export_options: {
       # CRITICAL FIX B: Also specify teamID inside the export_options hash
