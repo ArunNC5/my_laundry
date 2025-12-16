@@ -33,17 +33,19 @@ platform :ios do
     gym(
     scheme: "Runner",
     workspace: "Runner.xcworkspace",
-    clean: false, 
+    clean: false,
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
     export_method: "app-store",
+    
+    # CRITICAL NEW ADDITION: Explicitly set the team ID for export
+    export_team_id: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_TEAM_ID"],
+    
     export_options: {
       provisioningProfiles: {
         "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
       },
       signingStyle: "manual",
-      
-      # CRITICAL CHANGE: Use the FULL certificate name
       signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)" 
     }
   )
