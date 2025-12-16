@@ -18,9 +18,10 @@ platform :ios do
       api_key: api_key,
       app_identifier: "com.highonswift.myLaundry"
     )
-   set_keychain_access(
-        certificate_path: "./certs/distribution/..." 
-    )
+
+    certificate_name = "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)"
+    sh("security set-key-partition-list -S apple-tool:,apple: -s -k '' -t private \"#{certificate_name}\"")
+    
     update_code_signing_settings(
     path: "Runner.xcodeproj", 
     targets: ["Runner"], 
