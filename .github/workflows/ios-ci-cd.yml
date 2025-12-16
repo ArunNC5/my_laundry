@@ -39,10 +39,10 @@ jobs:
         run: sudo gem install fastlane -NV
         
       - name: 🔑 Import Code Signing Identity and Set Default Keychain
-        uses: apple-actions/import-codesigning-identity@v1
+        uses: apple-actions/import-codesign-certs@v2 
         with:
           # Base64 string of your Apple Distribution .p12 file.
-          p12-base64: ${{ secrets.P12_BASE64_CERT }} 
+          p12-file-base64: ${{ secrets.P12_BASE64_CERT }} 
           # Password for the .p12 file (use MATCH_PASSWORD if the p12 came from match).
           p12-password: ${{ secrets.MATCH_PASSWORD }}
 
