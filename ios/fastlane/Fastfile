@@ -4,7 +4,6 @@ platform :ios do
   desc "Build and upload IPA to TestFlight with automated code signing"
   lane :beta do
 
-    # 1. Define the App Store Connect API Key (for both match and upload_to_testflight)
     api_key = app_store_connect_api_key(
       key_id: ENV['ASC_API_KEY_ID'],
       issuer_id: ENV['ASC_ISSUER_ID'],
@@ -13,42 +12,43 @@ platform :ios do
     )
 
     match(
-      type: "appstore",       
-      readonly: true,          
+      type: "appstore",
+      readonly: true,
       api_key: api_key,
-      app_identifier: "com.highonswift.myLaundry"
+      app_identifier: "com.highonswift.myLaundry",
+      skip_certs: true
     )
 
-    certificate_name = "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)"
-    sh("security set-key-partition-list -S apple-tool:,apple: -s -k '' -t private \"#{certificate_name}\"")
-    
     update_code_signing_settings(
-    path: "Runner.xcodeproj", 
-    targets: ["Runner"], 
-    build_configurations: ["Release"],
-    code_sign_identity: "" 
+      path: "Runner.xcodeproj",
+      targets: ["Runner"],
+      build_configurations: ["Release"],
+      
+      code_sign_identity: ""
     )
 
+    # 4. BUILD: Archive and Export the IPA
     gym(
-    scheme: "Runner",
-    workspace: "Runner.xcworkspace",
-    clean: false,
-    output_directory: "../build/ios",
-    output_name: "Runner.ipa",
-    export_method: "app-store",
-    export_team_id: "7BXGN254MD", 
-    export_options: {
-      teamID: "7BXGN254MD", 
-      
-      provisioningProfiles: {
-        "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
-      },
-      signingStyle: "manual",
-      signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)" 
-    }
-  )
+      scheme: "Runner",
+      workspace: "Runner.xcworkspace",
+      clean: false,
+      output_directory: "../build/ios",
+      output_name: "Runner.ipa",
+      export_method: "app-store",
+      export_team_id: "7BXGN254MD",
+      export_options: {
+        teamID: "7BXGN254MD",
+        
+        # Use the environment variable set by the match step for the profile name
+        provisioningProfiles: {
+          "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
+        },
+        signingStyle: "manual",
+        signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)"
+      }
+    )
 
-    # 4. UPLOAD: Send the generated IPA to TestFlight
+    # 5. UPLOAD: Send the generated IPA to TestFlight
     upload_to_testflight(
       ipa: "../build/ios/Runner.ipa",
       api_key: api_key
