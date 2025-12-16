@@ -37,18 +37,22 @@ platform :ios do
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
     
-    # REVERTED: Use "app-store" because Fastlane 2.229.1 doesn't support "app-store-connect"
+    # REVERTED: Use "app-store"
     export_method: "app-store",
     
-    # CRITICAL FIX for "No Team Found in Archive"
-    export_team_id: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_TEAM_ID"], 
+    # CRITICAL FIX A: Explicitly set the team ID via the gym parameter
+    # Using the hardcoded value to eliminate ENV variable issues
+    export_team_id: "7BXGN254MD", 
     
     export_options: {
+      # CRITICAL FIX B: Also specify teamID inside the export_options hash
+      teamID: "7BXGN254MD", 
+      
       provisioningProfiles: {
+        # Bundle ID => Provisioning Profile Name
         "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
       },
       signingStyle: "manual",
-      # Using the full certificate name, which is the most robust option
       signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)" 
     }
   )
