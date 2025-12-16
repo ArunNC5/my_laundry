@@ -36,17 +36,16 @@ jobs:
           pod install
 
       - name: Install Fastlane
-        # Installing globally is necessary when not using a Gemfile outside the directory
         run: sudo gem install fastlane -NV
-
-      # CRUCIAL STEP: Setup SSH Agent and inject the key for 'match'
-      # This resolves the "Permission denied (publickey)" error when cloning the private certificates repo
-      - name: Setup SSH Key for Fastlane Match
-        uses: webfactory/ssh-agent@v0.9.0
+        
+      - name: 🔑 Import Code Signing Identity and Set Default Keychain
+        uses: apple-actions/import-codesigning-identity@v1
         with:
-          # Use the private key you generated specifically for the CI runner
-          ssh-private-key: ${{ secrets.MATCH_SSH_KEY }}
-          
+          # Base64 string of your Apple Distribution .p12 file.
+          p12-base64: ${{ secrets.P12_BASE64_CERT }} 
+          # Password for the .p12 file (use MATCH_PASSWORD if the p12 came from match).
+          p12-password: ${{ secrets.MATCH_PASSWORD }}
+
       - name: Build IPA + Upload to TestFlight
         # Set all necessary secrets as environment variables for Fastlane
         env:
@@ -56,7 +55,7 @@ jobs:
           ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
         run: |
           cd ios
-          # Execute the Fastlane lane that includes: match, gym, and upload_to_testflight
+          # Execute the Fastlane lane
           fastlane beta
 
       - name: Upload IPA artifact
