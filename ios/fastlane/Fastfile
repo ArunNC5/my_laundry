@@ -37,10 +37,10 @@ platform :ios do
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
     
-    # CRITICAL CHANGE 1: Use the new export method name
-    export_method: "app-store-connect",
+    # REVERTED: Use "app-store" because Fastlane 2.229.1 doesn't support "app-store-connect"
+    export_method: "app-store",
     
-    # CRITICAL CHANGE 2: Explicitly set the team ID for export
+    # CRITICAL FIX for "No Team Found in Archive"
     export_team_id: ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_TEAM_ID"], 
     
     export_options: {
@@ -48,6 +48,7 @@ platform :ios do
         "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
       },
       signingStyle: "manual",
+      # Using the full certificate name, which is the most robust option
       signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)" 
     }
   )
