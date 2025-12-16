@@ -12,45 +12,34 @@ platform :ios do
       is_key_content_base64: false
     )
 
-    # 2. CODE SIGNING: Fetch and install the App Store Certificate and Profile
-    # This step uses the MATCH_PASSWORD and the ASC_* keys from GitHub Secrets
-    # to clone the private repo, decrypt the files, and install them on the runner.
     match(
-      type: "appstore",        # Use the App Store type profile
-      readonly: true,          # CI should only download, not modify/revoke
-      api_key: api_key,         # Use the API key for communication with Apple
+      type: "appstore",       
+      readonly: true,          
+      api_key: api_key,
       app_identifier: "com.highonswift.myLaundry"
     )
-
+   set_keychain_access(
+        certificate_path: "./certs/distribution/..." 
+    )
     update_code_signing_settings(
-    path: "Runner.xcodeproj", # Use 'path' instead of 'xcodeproj'
-    targets: ["Runner"], # Use 'targets' instead of 'target_filter'
+    path: "Runner.xcodeproj", 
+    targets: ["Runner"], 
     build_configurations: ["Release"],
     code_sign_identity: "" 
-  )
+    )
 
-    # 3. BUILD: The gym step will now find the necessary profiles installed by match
     gym(
     scheme: "Runner",
     workspace: "Runner.xcworkspace",
     clean: false,
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
-    
-    # REVERTED: Use "app-store"
     export_method: "app-store",
-    
-    # CRITICAL FIX A: Explicitly set the team ID via the gym parameter
-    # Using the hardcoded value to eliminate ENV variable issues
     export_team_id: "7BXGN254MD", 
-    include_bitcode: false,
-    
     export_options: {
-      # CRITICAL FIX B: Also specify teamID inside the export_options hash
       teamID: "7BXGN254MD", 
       
       provisioningProfiles: {
-        # Bundle ID => Provisioning Profile Name
         "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
       },
       signingStyle: "manual",
