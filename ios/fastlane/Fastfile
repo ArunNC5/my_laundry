@@ -33,19 +33,18 @@ platform :ios do
     gym(
     scheme: "Runner",
     workspace: "Runner.xcworkspace",
-    clean: true,
+    clean: false, 
     output_directory: "../build/ios",
     output_name: "Runner.ipa",
     export_method: "app-store",
     export_options: {
-      # This is the correct parameter to map Bundle IDs to Profile Names
       provisioningProfiles: {
-        # Bundle ID => Provisioning Profile Name
         "com.highonswift.myLaundry" => ENV["SIGH_COM_HIGHONSWIFT_MYLAUNDRY_APPSTORE_PROFILE_NAME"]
       },
-      # (Optional but good practice) Specify the signing style and identity
       signingStyle: "manual",
-      signingCertificate: "Apple Distribution"
+      
+      # CRITICAL CHANGE: Use the FULL certificate name
+      signingCertificate: "Apple Distribution: Prahaladasumiran Techlabs Private Limited (7BXGN254MD)" 
     }
   )
 
