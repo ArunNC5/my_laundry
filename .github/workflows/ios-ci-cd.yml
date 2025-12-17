@@ -42,7 +42,7 @@ jobs:
           project-path: "ios/Runner.xcodeproj"
           scheme: "Runner" 
           output-path: "build/ios/Runner.ipa"
-          apple-key-id: ${{ secrets.ASC_API_KEY_ID }}
+          apple-key-id: ${{ secrets.ASCZ_API_KEY_ID }}
           apple-key-issuer-id: ${{ secrets.ASC_ISSUER_ID }}
           apple-key-content: ${{ secrets.ASC_API_KEY }}
           team-id: "7BXGN254MD"
