@@ -45,7 +45,7 @@ jobs:
       - name: Fastlane Match Setup
         run: |
           cd ios
-          bundle exec fastlane match appstore 
+          bundle exec fastlane match appstore --readonly
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           FASTLANE_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
