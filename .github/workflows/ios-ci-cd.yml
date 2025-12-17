@@ -24,6 +24,11 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
         
+      - name: Remove problematic Matchfile
+        run: |
+          rm -f fastlane/Matchfile
+          rm -f ios/fastlane/Matchfile
+        
       - name: Setup SSH Key for Fastlane Match
         uses: webfactory/ssh-agent@v0.9.0
         with:
