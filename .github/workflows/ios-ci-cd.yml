@@ -13,7 +13,31 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: stable
+          architecture: arm64
 
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Flutter Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run Flutter Tests
+        run: flutter test
+
+      - name: Install iOS dependencies (CocoaPods)
+        run: |
+          cd ios
+          pod install
+
+      - name: Install Fastlane
+        # Installing globally is necessary when not using a Gemfile outside the directory
+        run: sudo gem install fastlane -NV
       - name: Setup SSH Key for Fastlane Match
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -42,10 +66,10 @@ jobs:
           match-build-type: "appstore"
           ios-app-id: com.highonswift.myLaundry
           browserstack-upload: false 
-          output-path: Runner.ipa
+          output-path: build/ios/Runner.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: my-laundry-ios
-          path: Runner.ipa
+          path: build/ios/Runner.ipa
