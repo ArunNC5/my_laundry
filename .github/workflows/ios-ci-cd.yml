@@ -3,8 +3,8 @@ name: Flutter iOS CI/CD with TestFlight
 on:
   push:
     branches:
-      #- dev
-      #- development-ci-cd
+      - dev
+      - development-ci-cd
 
 jobs:
   ios-build:
@@ -50,7 +50,7 @@ jobs:
         # Set all necessary secrets as environment variables for Fastlane
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASCZ_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
         run: |
