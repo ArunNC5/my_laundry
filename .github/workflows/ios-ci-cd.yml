@@ -24,10 +24,17 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
         
-      - name: Remove problematic Matchfile
+      name: Force Create Valid Matchfile
         run: |
-          rm -f fastlane/Matchfile
-          rm -f ios/fastlane/Matchfile
+          find . -name "Matchfile" -delete
+          mkdir -p ios/fastlane
+          cat <<EOF > ios/fastlane/Matchfile
+          app_identifier(["com.highonswift.myLaundry"])
+          type("appstore")
+          storage_mode("git")
+          git_url("git@github.com:ArunNC5/Highohswift_mylaundry.git")
+          EOF
+          echo "✅ Matchfile forced into ios/fastlane/Matchfile"
         
       - name: Setup SSH Key for Fastlane Match
         uses: webfactory/ssh-agent@v0.9.0
