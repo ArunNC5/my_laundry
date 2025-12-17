@@ -24,7 +24,7 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
         
-      name: Force Create Valid Matchfile
+      - name: Force Create Valid Matchfile
         run: |
           find . -name "Matchfile" -delete
           mkdir -p ios/fastlane
