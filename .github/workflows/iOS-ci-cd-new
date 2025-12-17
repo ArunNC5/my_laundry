@@ -1,10 +1,10 @@
-name: Flutter iOS CI/CD with TestFlight
+name: Flutter iOS CI/CD with TestFlight-test
 
 on:
   push:
     branches:
       - dev
-      - dev-ci-cd
+      - development-ci-cd
 
 jobs:
   ios-build:
