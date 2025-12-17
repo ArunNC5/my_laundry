@@ -3,8 +3,8 @@ name: Flutter iOS CI/CD with TestFlight
 on:
   push:
     branches:
-      - dev
-      - development-ci-cd
+      #- dev
+      #- development-ci-cd
 
 jobs:
   ios-build:
