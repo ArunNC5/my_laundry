@@ -50,8 +50,9 @@ jobs:
           match-password: ${{ secrets.MATCH_PASSWORD }}
           match-git-url: "git@github.com:ArunNC5/Highohswift_mylaundry.git"
           match-build-type: "appstore"
-          ios-app-id: "com.highonswift.myLaundry"
+          ios-app-id: com.highonswift.myLaundry
           browserstack-upload: false 
+          app-identifier: com.highonswift.myLaundry
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
