@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build and Deploy CICD
+    name: Build and Deploy CICD for IOS
     runs-on: macos-latest
 
     steps:
