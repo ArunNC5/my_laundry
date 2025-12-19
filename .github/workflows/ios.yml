@@ -14,6 +14,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'          
+      - name: Install dependencies
+        run: flutter pub get
       - name: Deploy-IOS
         uses: sparkfabrik/ios-build-action@v2.3.0
         with:
