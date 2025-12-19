@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Deploy-IOS
-        uses: sparkfabrik/ios-build-action@v2.3.0
+        uses: sparkfabrik/ios-build-action@v2.3.2
         env:
           IOS_APP_ID: com.highonswift.myLaundry
         with:
