@@ -43,6 +43,6 @@ jobs:
           match-password: ${{ secrets.MATCH_PASSWORD }}
           match-git-url: ${{ secrets.MATCH_GIT_URL }}
           match-git-basic-authorization: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-          match-build-type: "appstore"
+          match-build-type: "development"
           ios-app-id: com.highonswift.myLaundry
       
