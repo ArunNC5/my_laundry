@@ -21,9 +21,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Deploy-IOS
-        uses: sparkfabrik/ios-build-action@v1
+        uses: sparkfabrik/ios-build-action@v2.3.2
         env:
           IOS_APP_ID: com.highonswift.myLaundry
+          SIGNING_STYLE: manual
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "match AppStore com.highonswift.myLaundry"
+          DEVELOPMENT_TEAM: ${{ secrets.TEAM_ID }}
+          AD_HOC_CODE_SIGNING_ALLOWED: NO
+          XCODEBUILD_FLAGS: "-allowProvisioningUpdates"
         with:
           upload-to-testflight: true
           increment-build-number: true
