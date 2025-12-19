@@ -48,7 +48,6 @@ jobs:
           bundle exec fastlane match appstore 
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
 
       - name: Deploy to TestFlight
         run: |
