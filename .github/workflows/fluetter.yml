@@ -28,14 +28,10 @@ jobs:
           # Try running the build locally with the build command to be sure of this path
           path: build/ios/ipa/*.ipa
 
-      - name: Upload to TestFlight
-        run: |
-          cd ios
-          bundle install
-          bundle exec fastlane pilot upload \
-            --ipa ../build/ios/ipa/*.ipa \
-            --skip_waiting_for_build_processing true
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASCZ_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY }}
+      - name: 'Upload app to TestFlight'
+        uses: apple-actions/upload-testflight-build@v3
+        with: 
+          app-path: 'build/ios/ipa/*.ipa' 
+          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
+          api-key-id: ${{ secrets.ASCZ_API_KEY_ID }}
+          api-private-key: ${{ secrets.ASC_API_KEY }}
