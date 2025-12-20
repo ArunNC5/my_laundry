@@ -1,4 +1,4 @@
-name: Build and distribute
+name: Build and distribute the IOS app
 
 on:
   push:
@@ -20,18 +20,22 @@ jobs:
           certificate-password: ${{ secrets.IOS_BUILD_CERTIFICATE_PASSWORD }}
           provisioning-profile-base64: ${{ secrets.IOS_MOBILE_PROVISIONING_PROFILE_BASE64 }}
           keychain-password: ${{ secrets.IOS_GITHUB_KEYCHAIN_PASSWORD }}
+      - name: Rename IPA
+        run: |
+          mkdir -p build/ios/ipa
+          mv build/ios/ipa/*.ipa build/ios/ipa/myLaundry.ipa
 
       - name: Archive IPA
         uses: actions/upload-artifact@v4
         with:
           name: release-ipa
           # Try running the build locally with the build command to be sure of this path
-          path: build/ios/ipa/*.ipa
+          path: build/ios/ipa/myLaundry.ipa
 
       - name: 'Upload app to TestFlight'
         uses: apple-actions/upload-testflight-build@v3
         with: 
-          app-path: 'build/ios/ipa/*.ipa' 
+          app-path: 'build/ios/ipa/myLaundry.ipa' 
           issuer-id: ${{ secrets.ASC_ISSUER_ID }}
           api-key-id: ${{ secrets.ASCZ_API_KEY_ID }}
           api-private-key: ${{ secrets.ASC_API_KEY }}
