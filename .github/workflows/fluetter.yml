@@ -1,6 +1,12 @@
 name: Build and distribute the IOS app
 
 on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "iOS build number (CFBundleVersion)"
+        required: true
+        default: "1"
   push:
     branches:
       - dev
@@ -15,7 +21,7 @@ jobs:
       - uses: cedvdb/action-flutter-build-ios@v1
         with:
           # always use --export-options-plist=ios/GithubActionsExportOptions.plist
-          build-cmd: flutter build ipa --release --export-options-plist ios/GithubActionsExportOptions.plist
+          build-cmd: flutter build ipa ${{ inputs.build_number }} --release --export-options-plist ios/GithubActionsExportOptions.plist
           certificate-base64: ${{ secrets.IOS_BUILD_CERTIFICATE_BASE64 }}
           certificate-password: ${{ secrets.IOS_BUILD_CERTIFICATE_PASSWORD }}
           provisioning-profile-base64: ${{ secrets.IOS_MOBILE_PROVISIONING_PROFILE_BASE64 }}
