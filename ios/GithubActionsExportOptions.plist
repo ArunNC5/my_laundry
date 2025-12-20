@@ -12,11 +12,11 @@
 	<string>development</string>
 	<key>signingStyle</key>
 	<string>manual</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>com.highonswift.myLaundry</key>
-    <string>match Development com.highonswift.myLaundry</string>
-  </dict>
+	<key>provisioningProfiles</key>
+	<dict>
+	  <key>com.highonswift.myLaundry</key>
+	  <string>{{ match Development com.highonswift.myLaundry }}</string>
+	</dict>
 	<key>stripSwiftSymbols</key>
 	<true/>
 	<key>teamID</key>
